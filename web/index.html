@@ -227,6 +227,9 @@
       return r;
     };
     const post = (url, body) => fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+    // display only: 2 decimals for big prices (gold, BTC), 5 for small ones (EURUSD); values sent to the server stay exact
+    const px = v => (v === null || v === undefined || v === "" || isNaN(v)) ? String(v ?? "--")
+      : Number(v).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: Math.abs(v) < 10 ? 5 : 2});
     const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
     async function loadMe() {
@@ -313,8 +316,8 @@
           <div class="signal-header"><div class="signal-action" style="color:${col}">${esc(p.action)}</div>
             ${trade ? '<button class="btn btn-green" onclick="paperFromCoach()">Paper trade this</button>' : ""}</div>
           <div class="muted">${esc(p.platform_seen)} · ${esc(p.symbol_seen)} · ${esc(p.timeframe_seen)} · ${esc(p.trend)} · confidence ${esc(p.confidence)}</div>
-          ${trade ? `<div class="metric-grid" style="margin-top:8px"><div class="metric-card"><span>Entry</span><strong>${p.entry}</strong></div>
-            <div class="metric-card"><span>Stop Loss</span><strong>${p.sl}</strong></div><div class="metric-card"><span>Take Profit</span><strong>${p.tp}</strong></div></div>` : ""}
+          ${trade ? `<div class="metric-grid" style="margin-top:8px"><div class="metric-card"><span>Entry</span><strong>${px(p.entry)}</strong></div>
+            <div class="metric-card"><span>Stop Loss</span><strong>${px(p.sl)}</strong></div><div class="metric-card"><span>Take Profit</span><strong>${px(p.tp)}</strong></div></div>` : ""}
           <p class="muted" style="margin-top:8px"><strong>Why</strong></p>${list(p.reasons)}
           <p class="muted"><strong>Risks</strong></p>${list(p.risks)}
           <p class="muted"><strong>On your screen:</strong> ${esc(p.what_to_click)}</p>
@@ -356,7 +359,7 @@
       try {
         const res = await fetch(`/api/intelligence?symbol=${currentSymbol}&tf=H1`);
         const d = await res.json();
-        document.getElementById("lblPrice").innerText = d.current_price;
+        document.getElementById("lblPrice").innerText = px(d.current_price);
         
         const tagDir = document.getElementById("tagDirection");
         tagDir.innerText = d.market_direction;
@@ -389,9 +392,9 @@
         const act = match.signal.action;
         document.getElementById("lblSignalAction").innerText = `${act} ${match.symbol}`;
         document.getElementById("lblSignalAction").style.color = act === "BUY" ? "var(--green)" : (act === "SELL" ? "var(--red)" : "var(--text)");
-        document.getElementById("lblEntry").innerText = match.signal.entry;
-        document.getElementById("lblSL").innerText = match.signal.sl;
-        document.getElementById("lblTP").innerText = match.signal.tp;
+        document.getElementById("lblEntry").innerText = px(match.signal.entry);
+        document.getElementById("lblSL").innerText = px(match.signal.sl);
+        document.getElementById("lblTP").innerText = px(match.signal.tp);
         document.getElementById("lblConfidence").innerText = `Confidence: ${(match.signal.confidence * 100).toFixed(0)}%`;
         document.getElementById("lblReasons").innerText = match.signal.reasons.join(" | ");
         document.getElementById("btnExecuteTrade").style.display = (act === "BUY" || act === "SELL") ? "block" : "none";
@@ -433,8 +436,8 @@
           <td><strong>${p.symbol}</strong></td>
           <td style="color:${p.side === 'BUY' ? 'var(--green)' : 'var(--red)'}; font-weight:700;">${p.side}</td>
           <td>${p.qty}</td>
-          <td>${p.open_price}</td>
-          <td style="color:${p.profit >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:600;">${p.profit >= 0 ? '+' : ''}${p.profit}</td>
+          <td>${px(p.open_price)}</td>
+          <td style="color:${p.profit >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:600;">${p.profit >= 0 ? '+' : ''}${Number(p.profit).toFixed(2)}</td>
           <td><button class="btn btn-red" style="padding:3px 8px; font-size:11px;" onclick="closePosition('${p.ticket}')">Close</button></td>
         </tr>
       `).join("");
@@ -484,7 +487,7 @@
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === "TICK" && msg.symbol === currentSymbol) {
-            document.getElementById("lblPrice").innerText = msg.price;
+            document.getElementById("lblPrice").innerText = px(msg.price);
             document.getElementById("lblDataTime").innerText = `Live Tick: ${new Date(msg.timestamp * 1000).toLocaleTimeString()}`;
           }
         } catch (e) {}
