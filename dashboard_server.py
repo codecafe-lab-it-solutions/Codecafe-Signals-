@@ -89,7 +89,7 @@ async def api_login(request):
         return JSONResponse({"error": "Wrong username or password."}, status_code=401)
     resp = JSONResponse({"ok": True, "user": name, "role": role})
     resp.set_cookie(COOKIE, auth.make_token(name), max_age=auth.SESSION_DAYS * 86400, httponly=True,
-                    samesite="lax", secure=request.url.scheme == "https" or bool(os.getenv("SPACE_ID")))
+                    samesite="lax", secure=request.url.scheme == "https")  # https behind Render's proxy via proxy_headers
     return resp
 
 
@@ -250,8 +250,16 @@ def api_emergency_stop(request):  # sync: Starlette runs it in a worker thread
     return JSONResponse(res)
 
 
+async def api_resume(request):
+    """Turn this login's kill switch off again."""
+    risk.reset_kill_switch()
+    return JSONResponse({"ok": True, "kill_switch_active": False})
+
+
 async def api_execute(request):
     """Execute approved trade."""
+    if risk.kill_switch_active:
+        return JSONResponse({"ok": False, "error": "Kill switch is on: press Resume trading first."}, status_code=403)
     try:
         body = await request.json()
         sym = body.get("symbol")
@@ -319,6 +327,7 @@ routes = [
     Route("/api/positions", api_positions),
     Route("/api/trades", api_trades),
     Route("/api/emergency_stop", api_emergency_stop, methods=["POST"]),
+    Route("/api/resume", api_resume, methods=["POST"]),
     Route("/api/execute", api_execute, methods=["POST"]),
     Route("/api/kb", api_kb),
     Route("/api/ml/predict", api_ml_predict),

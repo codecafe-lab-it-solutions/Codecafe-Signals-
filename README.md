@@ -1,13 +1,3 @@
----
-title: CodeCafe Signals
-emoji: 📈
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # CodeCafe Signals (prototype)
 
 A forex assistant that runs inside Claude Code. It reads MT5 market data, finds signals automatically, and places trades only after you approve them. It works on a demo account only.
@@ -30,23 +20,17 @@ A forex assistant that runs inside Claude Code. It reads MT5 market data, finds 
 - `news_scraper.py`: real-time financial RSS headlines scraper, sentiment scoring, and macro event risk flags (FOMC, CPI, NFP, SEC).
 - `executor.py`: universal hybrid trade execution engine (MT5, Bybit, Paper Broker, or Windows Screen UI automation).
 
-## Free cloud deploy (Hugging Face Spaces + Supabase)
+## Free cloud deploy (Render + Supabase)
 1. **Database.** On supabase.com, create a free project.
    - Open **Connect**, then **Session pooler**, and copy the URI. It must be the pooler URI, because the direct connection is IPv6-only.
    - Put your database password into the URI. This full URI is `DATABASE_URL`.
 2. **AI key (free).** On aistudio.google.com, choose **Get API key** and copy it. This is `GEMINI_API_KEY`. Free-tier prompts may be used by Google to improve its models.
-3. **Space.** On huggingface.co, choose **New Space**, pick **Docker** then **Blank**, and set it **Public**. A private Space can't be opened by clients without a Hugging Face account.
-4. **Secrets.** In the Space, open **Settings**, then **Variables and secrets**, and add these as **Secrets**:
-   - `DATABASE_URL`, `GEMINI_API_KEY` and `GROQ_API_KEY`.
-   - `SECRET_KEY`: any long random text.
-   - `ADMIN_USER` and `ADMIN_PASSWORD`, plus `DEMO_USER` and `DEMO_PASSWORD`. Use new passwords, not your local ones.
-5. **Upload.** Push this folder to the Space's git repo, or drag the files in through **Files**, then **Add file**, then **Upload files**.
-   - Never upload `.env`, `.venv/`, `data/` or `*.db`; `.dockerignore` excludes them from the image only, not from the upload.
-   - The `README.md` header (`sdk: docker`, `app_port: 7860`) tells Hugging Face how to run it.
-6. When the build finishes, open `https://<user>-<space>.hf.space` and log in as admin. Click **Clients** to create a login for each client.
+3. **Render.** On render.com, sign up with GitHub. Choose **New**, then **Blueprint**, and pick this repo. `render.yaml` sets up a free Docker web service with auto-deploy on every push to `main`.
+4. **Secrets.** Render asks for each `sync: false` value: `DATABASE_URL`, `GEMINI_API_KEY`, `GROQ_API_KEY`, `ADMIN_USER`/`ADMIN_PASSWORD` and `DEMO_USER`/`DEMO_PASSWORD`. `SECRET_KEY` is generated automatically. Use new passwords, not your local ones; `.env.cloud` (gitignored) holds a ready set.
+5. When the deploy is live, open `https://codecafe-signals.onrender.com` (or the URL Render shows) and log in as admin. Click **Clients** to create a login for each client.
 
 Free-tier limits:
-- The Space sleeps after 48 hours without visitors, and the first visit then takes about 30 seconds.
+- 512 MB RAM. The service sleeps after about 15 minutes without visitors, and the first visit then takes 30-60 seconds.
 - MT5 doesn't run in the cloud, so the cloud version uses paper trading only.
 
 ## Backtest results (MetaQuotes-Demo history, typical spread included, 1R = amount risked per trade)

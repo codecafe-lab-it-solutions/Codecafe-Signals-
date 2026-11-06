@@ -47,7 +47,8 @@ def calculate_adx(high: np.ndarray, low: np.ndarray, close: np.ndarray, period: 
         dx = 100.0 * np.where(di_sum == 0, 0.0, di_diff / np.where(di_sum == 0, 1.0, di_sum))
 
     adx = np.zeros(n)
-    adx[1:][period * 2 - 2 :] = smooth(dx[period - 1 :], period)[period - 1 :]
+    # smooth() keeps Wilder's running *sum*; dividing by period gives the average, so ADX stays in 0-100
+    adx[1:][period * 2 - 2 :] = smooth(dx[period - 1 :], period)[period - 1 :] / period
     return adx
 
 

@@ -26,15 +26,23 @@ class RiskEngine:
         self.risk_pct = risk_pct
         self.max_daily_loss_pct = max_daily_loss_pct
         self.max_positions = max_positions
-        self.kill_switch_active = False
+        self._stopped_users: set[str] = set()
+
+    @property
+    def kill_switch_active(self) -> bool:
+        """Per login: one client's kill switch never stops other clients (paper.USER is set per request)."""
+        import paper
+        return paper.USER.get() in self._stopped_users
 
     def trigger_kill_switch(self, reason: str = "Operator manual emergency stop") -> None:
-        self.kill_switch_active = True
-        db.log_audit("KILL_SWITCH_ENGAGED", {"reason": reason})
+        import paper
+        self._stopped_users.add(paper.USER.get())
+        db.log_audit("KILL_SWITCH_ENGAGED", {"reason": reason, "user": paper.USER.get()})
 
     def reset_kill_switch(self) -> None:
-        self.kill_switch_active = False
-        db.log_audit("KILL_SWITCH_RESET", {"status": "normal"})
+        import paper
+        self._stopped_users.discard(paper.USER.get())
+        db.log_audit("KILL_SWITCH_RESET", {"status": "normal", "user": paper.USER.get()})
 
     def calculate_position_size(self, balance: float, entry: float, sl: float, symbol: str) -> float:
         """Calculate lot / contract size based on 1% balance risk and stop loss distance."""

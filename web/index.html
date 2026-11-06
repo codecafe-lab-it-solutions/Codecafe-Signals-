@@ -81,7 +81,8 @@
     </div>
     <div class="row">
       <button class="btn btn-blue" onclick="runScan()">Scan Watchlist</button>
-      <button class="btn btn-red" onclick="emergencyStop()">Kill Switch</button>
+      <button class="btn btn-red" id="btnKill" onclick="emergencyStop()">Kill Switch</button>
+      <button class="btn btn-green" id="btnResume" onclick="resumeTrading()" style="display:none;">Resume trading</button>
       <span class="stat-pill" id="lblUser">...</span>
       <button class="btn btn-ghost" id="btnPassword" onclick="changePassword()">Password</button>
       <button class="btn btn-ghost" id="btnAdmin" onclick="toggleAdmin()" style="display:none;">Clients</button>
@@ -346,6 +347,8 @@
         document.getElementById("lblEquity").innerText = "$" + data.equity.toFixed(2);
         document.getElementById("lblDailyPnl").innerText = (data.daily_realized_pnl >= 0 ? "+$" : "-$") + Math.abs(data.daily_realized_pnl).toFixed(2);
         document.getElementById("lblDailyPnl").style.color = data.daily_realized_pnl >= 0 ? "var(--green)" : "var(--red)";
+        document.getElementById("btnKill").style.display = data.kill_switch_active ? "none" : "";
+        document.getElementById("btnResume").style.display = data.kill_switch_active ? "" : "none";
       } catch (e) { console.error(e); }
     }
 
@@ -452,8 +455,13 @@
       if (!confirm("Are you sure you want to engage the EMERGENCY KILL SWITCH and flatten all open positions?")) return;
       const res = await fetch("/api/emergency_stop", { method: "POST" });
       const data = await res.json();
-      alert("Emergency shutdown triggered. Positions flattened.");
+      alert("Kill switch on: your positions are closed and new trades are blocked until you press Resume trading.");
       loadPositions();
+      loadStatus();
+    }
+
+    async function resumeTrading() {
+      await post("/api/resume", {});
       loadStatus();
     }
 

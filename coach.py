@@ -149,7 +149,7 @@ def _claude(image_b64, text):
 
 
 def analyze(image_b64, symbol="", note=""):
-    if not os.getenv("SPACE_ID"):  # local only: lets Claude Code "read my screen"; never keep client screens in the cloud
+    if os.getenv("HOST", "127.0.0.1") == "127.0.0.1":  # local only (cloud sets HOST=0.0.0.0): never keep client screens on a server
         with open(FRAME, "wb") as f:
             f.write(base64.b64decode(image_b64))
     text = "Analyse this trading screen and give one trade plan."

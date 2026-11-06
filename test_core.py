@@ -12,6 +12,17 @@ assert rsi(np.arange(1, 40, dtype=float)) == 100.0
 mixed = 1.1 + 0.01 * np.sin(np.arange(80))
 assert 0 < rsi(mixed) < 100
 
+# ADX stays in 0-100 and a steady trend scores higher than a choppy range
+from regime import calculate_adx  # noqa: E402
+
+_x = np.arange(200, dtype=float)
+trend = 100 + _x * 0.5
+chop = 100 + np.sin(_x) * 2
+adx_trend = calculate_adx(trend + 0.3, trend - 0.3, trend)[-1]
+adx_chop = calculate_adx(chop + 0.3, chop - 0.3, chop)[-1]
+assert 0 <= adx_chop <= 100 and 0 <= adx_trend <= 100, (adx_trend, adx_chop)
+assert adx_trend > 50 > adx_chop, (adx_trend, adx_chop)
+
 # ATR of bars with a fixed 0.002 range and flat closes is 0.002
 c = np.full(40, 1.1)
 assert abs(atr(c + 0.001, c - 0.001, c) - 0.002) < 1e-12
