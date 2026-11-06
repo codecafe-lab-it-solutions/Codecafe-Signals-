@@ -1,0 +1,35 @@
+# Secrets & Environment
+.env
+.env.*
+!.env.example
+
+# Local databases & runtime data
+*.db
+*.sqlite3
+paper_account.json
+calendar_cache.json
+trade_journal.json
+calibration.json
+latest_frame.jpg
+data/
+
+# Python & Virtual Environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Build and temporary files
+not_required/
+*.spec
+dist/
+build/
+
+# IDE & System
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

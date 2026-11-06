@@ -1,0 +1,20 @@
+# secrets and local state never go into the image
+.env
+data/
+*.db
+paper_account.json
+trade_journal.json
+calibration.json
+calendar_cache.json
+latest_frame.jpg
+# local tooling
+.venv/
+__pycache__/
+*.pyc
+.claude/
+.mcp.json
+not_required/
+dist/
+build/
+*.bat
+*.vbs

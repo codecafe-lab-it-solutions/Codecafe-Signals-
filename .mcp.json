@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "yo-omni": {"command": "uv", "args": ["run", "--directory", "O:/Projects/CodeCafe Signals", "python", "omni_server.py"]},
+    "yo-signals": {"command": "uv", "args": ["run", "--directory", "O:/Projects/CodeCafe Signals", "python", "server.py"]},
+    "yo-crypto": {"command": "uv", "args": ["run", "--directory", "O:/Projects/CodeCafe Signals", "python", "crypto_server.py"]}
+  }
+}

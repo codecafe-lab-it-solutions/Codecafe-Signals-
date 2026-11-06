@@ -1,0 +1,28 @@
+{
+  "enabledMcpjsonServers": [
+    "yo-signals",
+    "yo-crypto"
+  ],
+  "permissions": {
+    "allow": [
+      "mcp__yo-signals__account",
+      "mcp__yo-signals__price",
+      "mcp__yo-signals__candles",
+      "mcp__yo-signals__scan",
+      "mcp__yo-signals__backtest",
+      "mcp__yo-signals__positions",
+      "mcp__yo-crypto__account",
+      "mcp__yo-crypto__price",
+      "mcp__yo-crypto__scan",
+      "mcp__yo-crypto__backtest",
+      "mcp__yo-crypto__positions",
+      "mcp__yo-crypto__suggest_size"
+    ],
+    "ask": [
+      "mcp__yo-signals__place_order",
+      "mcp__yo-signals__close_position",
+      "mcp__yo-crypto__place_order",
+      "mcp__yo-crypto__close_position"
+    ]
+  }
+}

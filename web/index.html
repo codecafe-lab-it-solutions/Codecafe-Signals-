@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeCafe Signals — Autonomous Trading Dashboard</title>
+  <style>
+    :root {
+      --bg: #0b0e14;
+      --card: #151922;
+      --card-border: #232936;
+      --text: #e1e4ea;
+      --text-muted: #8b92a2;
+      --green: #22c55e;
+      --green-bg: rgba(34, 197, 94, 0.12);
+      --red: #ef4444;
+      --red-bg: rgba(239, 68, 68, 0.12);
+      --blue: #3b82f6;
+      --amber: #f59e0b;
+      --amber-bg: rgba(245, 158, 11, 0.12);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+    header { background: #0f131c; border-bottom: 1px solid var(--card-border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+    .brand { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
+    .brand span { color: var(--blue); }
+    .stats-bar { display: flex; gap: 20px; align-items: center; font-size: 13px; }
+    .stat-pill { background: #1c2230; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--card-border); }
+    .stat-pill strong { color: #fff; margin-left: 4px; }
+    .btn { padding: 8px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; border: none; transition: 0.2s; }
+    .btn-red { background: var(--red); color: #fff; }
+    .btn-red:hover { background: #dc2626; }
+    .btn-blue { background: var(--blue); color: #fff; }
+    .btn-blue:hover { background: #2563eb; }
+    .btn-green { background: var(--green); color: #000; }
+    .btn-green:hover { background: #16a34a; color: #fff; }
+    .main-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; padding: 16px 24px; flex: 1; }
+    @media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr; } }
+    .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .card-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+    .sym-tabs { display: flex; gap: 8px; margin-bottom: 4px; }
+    .sym-tab { padding: 6px 12px; background: #1a202c; border: 1px solid var(--card-border); border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; color: var(--text-muted); }
+    .sym-tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .price-hero { display: flex; align-items: baseline; gap: 12px; }
+    .big-price { font-size: 28px; font-weight: 700; }
+    .tag { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .tag-bull { background: var(--green-bg); color: var(--green); }
+    .tag-bear { background: var(--red-bg); color: var(--red); }
+    .tag-warn { background: var(--amber-bg); color: var(--amber); }
+    .info-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .info-table td { padding: 6px 0; border-bottom: 1px solid #1a202c; }
+    .info-table td:last-child { text-align: right; font-weight: 600; color: #fff; }
+    .signal-box { background: #1a202c; border-radius: 6px; padding: 14px; border-left: 4px solid var(--blue); }
+    .signal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .signal-action { font-size: 20px; font-weight: 700; }
+    .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 12px; }
+    .metric-card { background: #10141d; padding: 8px; border-radius: 6px; text-align: center; }
+    .metric-card span { display: block; color: var(--text-muted); font-size: 10px; margin-bottom: 2px; }
+    .metric-card strong { font-size: 14px; color: #fff; }
+    table.data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.data-table th, table.data-table td { padding: 8px; text-align: left; border-bottom: 1px solid var(--card-border); }
+    table.data-table th { color: var(--text-muted); font-weight: 600; }
+    .btn-ghost { background: #1c2230; color: var(--text); border: 1px solid var(--card-border); }
+    .field { padding: 8px 10px; border-radius: 6px; border: 1px solid var(--card-border); background: #10141d; color: var(--text); font-size: 13px; min-width: 0; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .row .grow { flex: 1 1 160px; }
+    video { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 6px; display: block; }
+    .muted { color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+    .err { color: var(--red); font-size: 12px; }
+    ul.plain { padding-left: 18px; font-size: 12px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">CODECAFE SIGNALS <span>AUTONOMOUS</span></div>
+    <div class="stats-bar">
+      <div class="stat-pill">Broker: <strong id="lblBroker">PAPER</strong></div>
+      <div class="stat-pill">Balance: <strong id="lblBalance">$10,000.00</strong></div>
+      <div class="stat-pill">Equity: <strong id="lblEquity">$10,000.00</strong></div>
+      <div class="stat-pill">Today P&L: <strong id="lblDailyPnl">+$0.00</strong></div>
+    </div>
+    <div class="row">
+      <button class="btn btn-blue" onclick="runScan()">Scan Watchlist</button>
+      <button class="btn btn-red" onclick="emergencyStop()">Kill Switch</button>
+      <span class="stat-pill" id="lblUser">...</span>
+      <button class="btn btn-ghost" id="btnPassword" onclick="changePassword()">Password</button>
+      <button class="btn btn-ghost" id="btnAdmin" onclick="toggleAdmin()" style="display:none;">Clients</button>
+      <button class="btn btn-ghost" onclick="logout()">Log out</button>
+    </div>
+  </header>
+
+  <main class="main-grid">
+    <!-- Admin: client logins (admins only) -->
+    <div class="card" id="adminCard" style="display:none; grid-column: 1 / -1;">
+      <div class="card-title">Client logins (admin)</div>
+      <div class="row">
+        <input class="field grow" id="newUser" placeholder="New username (e.g. client1)" autocomplete="off">
+        <input class="field grow" id="newPass" placeholder="Temporary password (8+ characters)" autocomplete="new-password">
+        <select class="field" id="newRole"><option value="client">client</option><option value="demo">demo</option><option value="admin">admin</option></select>
+        <button class="btn btn-green" onclick="createUser()">Create login</button>
+      </div>
+      <div class="err" id="adminMsg"></div>
+      <table class="data-table"><thead><tr><th>Username</th><th>Role</th><th>Created</th><th></th></tr></thead><tbody id="tblUsers"></tbody></table>
+      <p class="muted">Give each client their username and temporary password; they change it with the Password button after logging in. The demo role is for pitching: it can't change its password.</p>
+    </div>
+
+    <!-- LEFT: System 1 Market Intelligence -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      <!-- Screen Coach -->
+      <div class="card">
+        <div class="card-title"><span>Screen Coach: share any trading screen</span></div>
+        <video id="video" autoplay muted playsinline></video>
+        <div class="row">
+          <button class="btn btn-blue" id="btnShare" onclick="shareScreen()">Share trading screen</button>
+          <button class="btn btn-ghost" id="btnAnalyze" onclick="analyzeScreen()" disabled>Analyse now</button>
+        </div>
+        <div class="row">
+          <input class="field grow" id="coachSymbol" placeholder="Symbol for live data + news (optional): BTCUSDT, EURUSD, RELIANCE.NS">
+          <input class="field grow" id="coachNote" placeholder="Note (optional)">
+        </div>
+        <div id="coachPlan" class="muted">Pick the tab or window with your broker or chart (Zerodha, Bybit, Binance, MT5, TradingView...). You log in there as usual; this site never sees your broker password.</div>
+      </div>
+      <div class="card">
+        <div class="card-title">
+          <span>Watchlist & Live Quotes</span>
+          <span id="lblDataTime" style="font-size:11px; text-transform:none;">Live Feeds</span>
+        </div>
+        <div class="sym-tabs" id="tabContainer">
+          <button class="sym-tab active" onclick="switchSymbol('XAUUSD')">Gold (XAUUSD)</button>
+          <button class="sym-tab" onclick="switchSymbol('XAGUSD')">Silver (XAGUSD)</button>
+          <button class="sym-tab" onclick="switchSymbol('USOUSD')">Crude Oil (USOUSD)</button>
+          <button class="sym-tab" onclick="switchSymbol('SPX500')">S&P 500 (SPX500)</button>
+        </div>
+        <div class="price-hero">
+          <div class="big-price" id="lblPrice">---</div>
+          <div class="tag" id="tagDirection">BULLISH</div>
+          <div class="tag tag-warn" id="tagRegime">STRONG_TREND</div>
+        </div>
+        <table class="info-table">
+          <tr><td>Volatility Condition</td><td id="lblVolatility">Normal</td></tr>
+          <tr><td>ADX Trend Strength</td><td id="lblADX">--</td></tr>
+          <tr><td>ML Barrier Win Odds</td><td id="lblMLOdds">--%</td></tr>
+          <tr><td>Candlestick Patterns</td><td id="lblCandlePatterns">None</td></tr>
+          <tr><td>Support Levels</td><td id="lblSupport">--</td></tr>
+          <tr><td>Resistance Levels</td><td id="lblResistance">--</td></tr>
+          <tr><td>Fair Value Gaps (FVG)</td><td id="lblFVG">--</td></tr>
+          <tr><td>Order Blocks</td><td id="lblOrderBlocks">--</td></tr>
+          <tr><td>RAG Strategy Rules</td><td id="lblKBRules">--</td></tr>
+        </table>
+      </div>
+
+      <!-- Macro Intelligence & News Card -->
+      <div class="card">
+        <div class="card-title">System 1.D: Macro & News Intelligence (Groq LLM)</div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <div class="tag" id="tagNewsSentiment">NEUTRAL</div>
+          <div class="tag tag-warn" id="tagEventRisk">TRADE_PERMITTED</div>
+        </div>
+        <p id="lblNewsSummary" style="font-size:12px; color:#c9d1d9; line-height:1.5;">Scraping news headlines...</p>
+        <div id="lblTopEvents" style="font-size:11px; color:var(--text-muted);"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: System 2 Strategy & System 3 Execution -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      <!-- Active Strategy Signal -->
+      <div class="card">
+        <div class="card-title">
+          <span>System 2: Strategy Signal & Risk Sizing</span>
+          <span id="lblConfidence">Confidence: --%</span>
+        </div>
+        <div class="signal-box" id="signalBox">
+          <div class="signal-header">
+            <div class="signal-action" id="lblSignalAction">SCANNING...</div>
+            <button class="btn btn-green" id="btnExecuteTrade" onclick="executeCurrentSignal()" style="display:none;">Execute Paper Trade</button>
+          </div>
+          <div class="metric-grid">
+            <div class="metric-card"><span>Entry</span><strong id="lblEntry">--</strong></div>
+            <div class="metric-card"><span>Stop Loss</span><strong id="lblSL">--</strong></div>
+            <div class="metric-card"><span>Take Profit</span><strong id="lblTP">--</strong></div>
+          </div>
+          <p id="lblReasons" style="font-size:11px; color:var(--text-muted); margin-top:8px;">Evaluating market setups...</p>
+        </div>
+      </div>
+
+      <!-- Open Positions -->
+      <div class="card">
+        <div class="card-title">System 3: Active Open Positions</div>
+        <table class="data-table">
+          <thead>
+            <tr><th>Ticket</th><th>Symbol</th><th>Side</th><th>Size</th><th>Entry</th><th>P&L</th><th>Action</th></tr>
+          </thead>
+          <tbody id="tblPositions">
+            <tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No open positions</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Backtest Quick Runner -->
+      <div class="card">
+        <div class="card-title">
+          <span>System 2.F: Walk-Forward Backtester</span>
+          <button class="btn btn-blue" style="padding:4px 8px; font-size:11px;" onclick="runBacktest()">Run Backtest (300 Bars)</button>
+        </div>
+        <div class="metric-grid" id="backtestMetrics">
+          <div class="metric-card"><span>Win Rate</span><strong id="btWinRate">--%</strong></div>
+          <div class="metric-card"><span>Profit Factor</span><strong id="btPF">--</strong></div>
+          <div class="metric-card"><span>Max Drawdown</span><strong id="btDD">--%</strong></div>
+          <div class="metric-card"><span>Sharpe Ratio</span><strong id="btSharpe">--</strong></div>
+          <div class="metric-card"><span>Expectancy</span><strong id="btExp">--R</strong></div>
+          <div class="metric-card"><span>Total Trades</span><strong id="btTrades">--</strong></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let currentSymbol = "XAUUSD";
+    let latestSignal = null;
+
+    // Any 401 means the session ended: go back to the login page.
+    const _fetch = window.fetch;
+    window.fetch = async (...args) => {
+      const r = await _fetch(...args);
+      if (r.status === 401) location.href = "/login";
+      return r;
+    };
+    const post = (url, body) => fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+    async function loadMe() {
+      const me = await (await fetch("/api/me")).json();
+      document.getElementById("lblUser").innerHTML = `User: <strong>${esc(me.user)}</strong>`;
+      document.getElementById("btnAdmin").style.display = me.role === "admin" ? "" : "none";
+      document.getElementById("btnPassword").style.display = me.role === "demo" ? "none" : "";
+    }
+
+    async function logout() { await post("/api/logout", {}); location.href = "/login"; }
+
+    async function changePassword() {
+      const old = prompt("Current password:"); if (old === null) return;
+      const nw = prompt("New password (8+ characters):"); if (nw === null) return;
+      if (nw !== prompt("Type the new password again:")) return alert("The new passwords don't match.");
+      const j = await (await post("/api/password", {old, new: nw})).json();
+      alert(j.ok ? "Password changed." : j.error);
+    }
+
+    // ---- Admin: client logins ----
+    function toggleAdmin() {
+      const c = document.getElementById("adminCard");
+      c.style.display = c.style.display === "none" ? "" : "none";
+      if (c.style.display === "") loadUsers();
+    }
+    async function adminCall(body) {
+      const r = await post("/api/admin/users", body), j = await r.json();
+      document.getElementById("adminMsg").textContent = r.ok ? "" : j.error;
+      if (r.ok) renderUsers(j);
+      return r.ok;
+    }
+    async function loadUsers() { renderUsers(await (await fetch("/api/admin/users")).json()); }
+    function renderUsers(list) {
+      document.getElementById("tblUsers").innerHTML = list.map(u => `<tr><td><strong>${esc(u.username)}</strong></td><td>${esc(u.role)}</td>
+        <td>${u.created ? new Date(u.created * 1000).toLocaleDateString() : ""}</td>
+        <td><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px" onclick="resetUser('${esc(u.username)}')">Reset password</button>
+            <button class="btn btn-red" style="padding:3px 8px;font-size:11px" onclick="deleteUser('${esc(u.username)}')">Delete</button></td></tr>`).join("");
+    }
+    async function createUser() {
+      const ok = await adminCall({action: "create", username: document.getElementById("newUser").value,
+        password: document.getElementById("newPass").value, role: document.getElementById("newRole").value});
+      if (ok) { document.getElementById("newUser").value = ""; document.getElementById("newPass").value = ""; }
+    }
+    async function resetUser(name) {
+      const pw = prompt(`New temporary password for ${name} (8+ characters):`);
+      if (pw) await adminCall({action: "reset", username: name, password: pw});
+    }
+    async function deleteUser(name) {
+      if (confirm(`Delete the login ${name}? Their paper account data stays stored but they can no longer log in.`)) await adminCall({action: "delete", username: name});
+    }
+
+    // ---- Screen Coach ----
+    let stream = null, coachBusy = false, coachPlan = null;
+    async function shareScreen() {
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({video: true, audio: false});
+        document.getElementById("video").srcObject = stream;
+        document.getElementById("btnAnalyze").disabled = false;
+        stream.getVideoTracks()[0].onended = () => { stream = null; document.getElementById("btnAnalyze").disabled = true; };
+      } catch (e) { document.getElementById("coachPlan").innerHTML = '<span class="err">Screen share was cancelled or blocked.</span>'; }
+    }
+    function grabFrame() {
+      const v = document.getElementById("video"), scale = Math.min(1, 1600 / v.videoWidth);
+      const c = document.createElement("canvas");
+      c.width = Math.round(v.videoWidth * scale); c.height = Math.round(v.videoHeight * scale);
+      c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+      return c.toDataURL("image/jpeg", 0.85).split(",")[1];
+    }
+    async function analyzeScreen() {
+      if (coachBusy || !stream) return;
+      coachBusy = true;
+      const out = document.getElementById("coachPlan"), btn = document.getElementById("btnAnalyze");
+      btn.disabled = true; out.innerHTML = "Reading your screen...";
+      try {
+        const r = await post("/api/coach", {image: grabFrame(), symbol: document.getElementById("coachSymbol").value,
+          note: document.getElementById("coachNote").value});
+        const p = await r.json();
+        if (!r.ok || p.error) throw new Error(p.error || r.statusText);
+        coachPlan = p;
+        const col = p.action === "BUY" ? "var(--green)" : (p.action === "SELL" ? "var(--red)" : "var(--amber)");
+        const trade = p.action !== "WAIT";
+        const list = xs => '<ul class="plain">' + (xs || []).map(x => "<li>" + esc(x) + "</li>").join("") + "</ul>";
+        out.innerHTML = `<div class="signal-box" style="border-left-color:${col}">
+          <div class="signal-header"><div class="signal-action" style="color:${col}">${esc(p.action)}</div>
+            ${trade ? '<button class="btn btn-green" onclick="paperFromCoach()">Paper trade this</button>' : ""}</div>
+          <div class="muted">${esc(p.platform_seen)} · ${esc(p.symbol_seen)} · ${esc(p.timeframe_seen)} · ${esc(p.trend)} · confidence ${esc(p.confidence)}</div>
+          ${trade ? `<div class="metric-grid" style="margin-top:8px"><div class="metric-card"><span>Entry</span><strong>${p.entry}</strong></div>
+            <div class="metric-card"><span>Stop Loss</span><strong>${p.sl}</strong></div><div class="metric-card"><span>Take Profit</span><strong>${p.tp}</strong></div></div>` : ""}
+          <p class="muted" style="margin-top:8px"><strong>Why</strong></p>${list(p.reasons)}
+          <p class="muted"><strong>Risks</strong></p>${list(p.risks)}
+          <p class="muted"><strong>On your screen:</strong> ${esc(p.what_to_click)}</p>
+          <p class="muted">${new Date().toLocaleTimeString()} · Educational idea, not financial advice. You place real orders yourself.</p></div>`;
+      } catch (e) { out.innerHTML = '<span class="err">' + esc(e.message) + "</span>"; }
+      coachBusy = false; btn.disabled = !stream;
+    }
+    async function paperFromCoach() {
+      const p = coachPlan, sym = document.getElementById("coachSymbol").value.trim() || p.symbol_seen;
+      const qty = prompt(`Paper ${p.action} ${sym} with SL ${p.sl} and TP ${p.tp}.\nQuantity (units, e.g. 0.01 BTC or 10 shares):`);
+      if (!qty) return;
+      const j = await (await post("/api/execute", {symbol: sym, side: p.action, qty, sl: p.sl, tp: p.tp})).json();
+      alert(j.ok ? `Paper trade filled at ${j.price}.` : "Rejected: " + (j.error || j.comment));
+      loadPositions(); loadStatus();
+    }
+
+    async function closePosition(ticket) {
+      if (!confirm(`Close paper position #${ticket} at the current price?`)) return;
+      const j = await (await post("/api/close", {ticket})).json();
+      if (!j.ok) alert("Close failed: " + (j.error || j.comment));
+      loadPositions(); loadStatus();
+    }
+
+    async function loadStatus() {
+      try {
+        const res = await fetch("/api/status");
+        const data = await res.json();
+        document.getElementById("lblBroker").innerText = data.broker.toUpperCase();
+        document.getElementById("lblBalance").innerText = "$" + data.balance.toFixed(2);
+        document.getElementById("lblEquity").innerText = "$" + data.equity.toFixed(2);
+        document.getElementById("lblDailyPnl").innerText = (data.daily_realized_pnl >= 0 ? "+$" : "-$") + Math.abs(data.daily_realized_pnl).toFixed(2);
+        document.getElementById("lblDailyPnl").style.color = data.daily_realized_pnl >= 0 ? "var(--green)" : "var(--red)";
+      } catch (e) { console.error(e); }
+    }
+
+    async function loadIntelligence() {
+      try {
+        const res = await fetch(`/api/intelligence?symbol=${currentSymbol}&tf=H1`);
+        const d = await res.json();
+        document.getElementById("lblPrice").innerText = d.current_price;
+        
+        const tagDir = document.getElementById("tagDirection");
+        tagDir.innerText = d.market_direction;
+        tagDir.className = "tag " + (d.market_direction === "BULLISH" ? "tag-bull" : (d.market_direction === "BEARISH" ? "tag-bear" : "tag-warn"));
+        
+        document.getElementById("tagRegime").innerText = d.market_regime;
+        document.getElementById("lblVolatility").innerText = d.volatility_condition;
+        document.getElementById("lblADX").innerText = d.adx;
+        document.getElementById("lblMLOdds").innerText = (d.ml_barrier_win_odds * 100).toFixed(1) + "%" + (d.ml_high_prob_setup ? " 🔥" : "");
+        document.getElementById("lblCandlePatterns").innerText = d.candlestick_patterns.join(", ") || "None";
+        document.getElementById("lblSupport").innerText = d.support_levels.join(", ") || "--";
+        document.getElementById("lblResistance").innerText = d.resistance_levels.join(", ") || "--";
+        document.getElementById("lblFVG").innerText = `${d.technical_structure.active_fvgs_count} gaps detected`;
+        document.getElementById("lblOrderBlocks").innerText = `${d.technical_structure.order_blocks_count} order blocks`;
+        document.getElementById("lblKBRules").innerText = d.retrieved_trading_rules.join(", ") || "Standard Rules";
+        
+        document.getElementById("tagNewsSentiment").innerText = d.news_sentiment;
+        document.getElementById("tagNewsSentiment").className = "tag " + (d.news_sentiment === "BULLISH" ? "tag-bull" : (d.news_sentiment === "BEARISH" ? "tag-bear" : "tag-warn"));
+        document.getElementById("tagEventRisk").innerText = d.event_risk_action;
+        document.getElementById("lblNewsSummary").innerText = d.news_summary || "No news summary.";
+      } catch (e) { console.error(e); }
+    }
+
+    async function runScan() {
+      const res = await fetch("/api/scan");
+      const scans = await res.json();
+      const match = scans.find(s => s.symbol === currentSymbol) || scans[0];
+      if (match && match.signal) {
+        latestSignal = match.signal;
+        const act = match.signal.action;
+        document.getElementById("lblSignalAction").innerText = `${act} ${match.symbol}`;
+        document.getElementById("lblSignalAction").style.color = act === "BUY" ? "var(--green)" : (act === "SELL" ? "var(--red)" : "var(--text)");
+        document.getElementById("lblEntry").innerText = match.signal.entry;
+        document.getElementById("lblSL").innerText = match.signal.sl;
+        document.getElementById("lblTP").innerText = match.signal.tp;
+        document.getElementById("lblConfidence").innerText = `Confidence: ${(match.signal.confidence * 100).toFixed(0)}%`;
+        document.getElementById("lblReasons").innerText = match.signal.reasons.join(" | ");
+        document.getElementById("btnExecuteTrade").style.display = (act === "BUY" || act === "SELL") ? "block" : "none";
+      }
+      loadPositions();
+    }
+
+    async function executeCurrentSignal() {
+      if (!latestSignal) return;
+      const res = await fetch("/api/execute", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          symbol: latestSignal.symbol,
+          side: latestSignal.action,
+          qty: 0.1,
+          sl: latestSignal.sl,
+          tp: latestSignal.tp,
+          price: latestSignal.entry
+        })
+      });
+      const data = await res.json();
+      alert(data.ok ? "Trade executed successfully!" : "Rejected: " + (data.error || data.comment));
+      loadPositions();
+      loadStatus();
+    }
+
+    async function loadPositions() {
+      const res = await fetch("/api/positions");
+      const positions = await res.json();
+      const tbody = document.getElementById("tblPositions");
+      if (!positions || positions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No open positions</td></tr>';
+        return;
+      }
+      tbody.innerHTML = positions.map(p => `
+        <tr>
+          <td>#${p.ticket}</td>
+          <td><strong>${p.symbol}</strong></td>
+          <td style="color:${p.side === 'BUY' ? 'var(--green)' : 'var(--red)'}; font-weight:700;">${p.side}</td>
+          <td>${p.qty}</td>
+          <td>${p.open_price}</td>
+          <td style="color:${p.profit >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:600;">${p.profit >= 0 ? '+' : ''}${p.profit}</td>
+          <td><button class="btn btn-red" style="padding:3px 8px; font-size:11px;" onclick="closePosition('${p.ticket}')">Close</button></td>
+        </tr>
+      `).join("");
+    }
+
+    async function runBacktest() {
+      const res = await fetch(`/api/backtest?symbol=${currentSymbol}&tf=H1&count=300`);
+      const d = await res.json();
+      document.getElementById("btWinRate").innerText = d.win_rate_pct + "%";
+      document.getElementById("btPF").innerText = d.profit_factor;
+      document.getElementById("btDD").innerText = d.max_drawdown_pct + "%";
+      document.getElementById("btSharpe").innerText = d.sharpe_ratio;
+      document.getElementById("btExp").innerText = d.expectancy_r + "R";
+      document.getElementById("btTrades").innerText = d.total_trades;
+    }
+
+    async function emergencyStop() {
+      if (!confirm("Are you sure you want to engage the EMERGENCY KILL SWITCH and flatten all open positions?")) return;
+      const res = await fetch("/api/emergency_stop", { method: "POST" });
+      const data = await res.json();
+      alert("Emergency shutdown triggered. Positions flattened.");
+      loadPositions();
+      loadStatus();
+    }
+
+    function switchSymbol(sym) {
+      currentSymbol = sym;
+      document.querySelectorAll(".sym-tab").forEach(btn => {
+        btn.classList.toggle("active", btn.innerText.includes(sym));
+      });
+      loadIntelligence();
+      runScan();
+      runBacktest();
+    }
+
+    // WebSocket Live Streaming
+    function connectLiveStream() {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${proto}//${location.host}/ws/live`;
+      const ws = new WebSocket(wsUrl);
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === "TICK" && msg.symbol === currentSymbol) {
+            document.getElementById("lblPrice").innerText = msg.price;
+            document.getElementById("lblDataTime").innerText = `Live Tick: ${new Date(msg.timestamp * 1000).toLocaleTimeString()}`;
+          }
+        } catch (e) {}
+      };
+      ws.onclose = () => { setTimeout(connectLiveStream, 3000); };
+    }
+
+    // Initial load
+    loadMe();
+    connectLiveStream();
+    loadStatus();
+    loadIntelligence();
+    runScan();
+    loadPositions();
+    runBacktest();
+    setInterval(() => { loadStatus(); loadPositions(); }, 10000);
+  </script>
+</body>
+</html>

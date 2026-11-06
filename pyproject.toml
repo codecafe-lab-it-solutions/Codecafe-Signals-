@@ -1,0 +1,16 @@
+[project]
+name = "codecafe-signals"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=2.4.0",
+    "mcp>=2.3.0",
+    "metatrader5>=5.0.6231; sys_platform == 'win32'",
+    "numpy>=2.5.4",
+    "pillow>=13.0.0",
+    "psycopg[binary]>=3.3.8",
+    "scikit-learn>=1.9.1",
+    "starlette>=1.10.0",
+    "uvicorn>=0.54.0",
+    "websockets>=17.4",
+]

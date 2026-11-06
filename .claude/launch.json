@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "yo-web",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "dashboard_server.py"],
+      "port": 8780,
+      "url": "http://127.0.0.1:8780"
+    }
+  ]
+}
