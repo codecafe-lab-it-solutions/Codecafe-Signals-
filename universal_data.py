@@ -88,21 +88,22 @@ def fetch_yahoo_candles(symbol: str, interval: str = "H1", count: int = 100) -> 
 
 def fetch_universal_candles(symbol: str, timeframe: str = "H1", count: int = 100) -> dict:
     """Intelligently route symbol to MT5, Bybit, or Yahoo Finance."""
-    # 1. Try MT5 if MT5 is initialized or available
-    try:
-        import MetaTrader5 as mt5
-        from server import closed_rates, connect
-        connect()
-        r = closed_rates(symbol, timeframe, count)
-        if r is not None and len(r) > 0:
-            return {
-                "symbol": symbol, "interval": timeframe, "source": "mt5",
-                "time": r["time"].astype(int), "open": r["open"].astype(float),
-                "high": r["high"].astype(float), "low": r["low"].astype(float),
-                "close": r["close"].astype(float), "volume": r["tick_volume"].astype(float),
-            }
-    except Exception:
-        pass  # Fall through to Bybit / Yahoo
+    # 1. Try MT5 only if TRADING_MODE is explicitly mt5
+    if os.getenv("TRADING_MODE", "").lower() == "mt5":
+        try:
+            import MetaTrader5 as mt5
+            from server import closed_rates, connect
+            connect()
+            r = closed_rates(symbol, timeframe, count)
+            if r is not None and len(r) > 0:
+                return {
+                    "symbol": symbol, "interval": timeframe, "source": "mt5",
+                    "time": r["time"].astype(int), "open": r["open"].astype(float),
+                    "high": r["high"].astype(float), "low": r["low"].astype(float),
+                    "close": r["close"].astype(float), "volume": r["tick_volume"].astype(float),
+                }
+        except Exception:
+            pass  # Fall through to Bybit / Yahoo
             
     # 2. Try Bybit if crypto symbol ends with USDT
     if symbol.upper().endswith("USDT"):
