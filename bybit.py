@@ -56,8 +56,8 @@ def private(method, path, **params):
     return _call(TRADE, method, path, params, signed=True)
 
 
-def klines(symbol, timeframe="H1", count=1000):
-    """Closed spot candles, oldest first, as numpy arrays keyed time(s, UTC)/open/high/low/close."""
+def klines(symbol, timeframe="H1", count=1000, closed=True):
+    """Spot candles, oldest first (closed=False keeps the forming one, whose close is the live price), as numpy arrays keyed time(s, UTC)/open/high/low/close."""
     if timeframe not in INTERVALS:
         raise ValueError(f"timeframe must be one of {list(INTERVALS)}")
     rows, end = {}, None
@@ -72,7 +72,8 @@ def klines(symbol, timeframe="H1", count=1000):
         if len(page) < 1000:
             break
         end = oldest - 1
-    data = [rows[k] for k in sorted(rows)][:-1][-count:]  # drop the still-forming last candle
+    data = [rows[k] for k in sorted(rows)]
+    data = (data[:-1] if closed else data)[-count:]  # closed: drop the still-forming last candle
     if not data:
         raise RuntimeError(f"No candles for {symbol}")
     a = np.array([[float(x) for x in r[:5]] for r in data])

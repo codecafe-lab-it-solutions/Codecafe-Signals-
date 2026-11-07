@@ -102,6 +102,19 @@
     .sym-tab { font-family: var(--sans); padding: 7px 12px; background: transparent; border: 1px solid var(--card-border); border-radius: 999px; font-size: 12px; cursor: pointer; font-weight: 600; color: var(--text-muted); transition: 0.15s; }
     .sym-tab:hover { color: var(--text); border-color: #4a3d33; }
     .sym-tab.active { background: var(--crema-bg); color: var(--crema); border-color: rgba(224, 168, 94, 0.5); }
+    .search { position: relative; }
+    .card:has(.search) { position: relative; z-index: 5; }  /* keeps the result list above the cards below it */
+    .search .field { width: 100%; padding: 11px 14px; font-size: 14px; }
+    #searchResults { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 20; background: var(--card-2); border: 1px solid var(--card-border);
+                     border-radius: 10px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55); overflow: hidden; max-height: 340px; overflow-y: auto; }
+    .sr-item { display: grid; grid-template-columns: minmax(90px, auto) 1fr auto; gap: 12px; align-items: baseline; width: 100%; text-align: left;
+               background: none; border: none; border-bottom: 1px solid var(--line); color: var(--text); padding: 10px 14px; cursor: pointer; font-family: var(--sans); font-size: 13px; }
+    .sr-item:hover, .sr-item:focus-visible { background: var(--crema-bg); outline: none; }
+    .sr-item strong { font-family: var(--mono); color: var(--crema); font-weight: 500; }
+    .sr-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sr-item em { font-style: normal; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+    .sr-empty { padding: 12px 14px; color: var(--text-muted); font-size: 13px; }
+    @media (max-width: 640px) { .sr-item { grid-template-columns: auto 1fr; } .sr-item em { display: none; } }
     .price-hero { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .big-price { font-family: var(--mono); font-size: clamp(36px, 6vw, 56px); font-weight: 500; letter-spacing: -2px; line-height: 1; margin-right: 8px; }
     .source { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -207,11 +220,16 @@
     <!-- Market -->
     <div class="card span-7">
       <div class="card-title"><span><span class="num">01</span>Market</span><span id="lblDataTime">Connecting...</span></div>
+      <div class="search">
+        <input class="field" id="symSearch" type="search" autocomplete="off" aria-label="Search any market"
+               placeholder="Search any market: Reliance, AAPL, Bitcoin, EURUSD, Nifty...">
+        <div id="searchResults" hidden></div>
+      </div>
       <div class="sym-tabs" id="tabContainer">
-        <button class="sym-tab active" onclick="switchSymbol('XAUUSD')">Gold · XAUUSD</button>
-        <button class="sym-tab" onclick="switchSymbol('XAGUSD')">Silver · XAGUSD</button>
-        <button class="sym-tab" onclick="switchSymbol('USOUSD')">Crude Oil · USOUSD</button>
-        <button class="sym-tab" onclick="switchSymbol('SPX500')">S&amp;P 500 · SPX500</button>
+        <button class="sym-tab active" data-sym="XAUUSD" onclick="switchSymbol('XAUUSD')">Gold · XAUUSD</button>
+        <button class="sym-tab" data-sym="XAGUSD" onclick="switchSymbol('XAGUSD')">Silver · XAGUSD</button>
+        <button class="sym-tab" data-sym="USOUSD" onclick="switchSymbol('USOUSD')">Crude Oil · USOUSD</button>
+        <button class="sym-tab" data-sym="SPX500" onclick="switchSymbol('SPX500')">S&amp;P 500 · SPX500</button>
       </div>
       <div class="price-hero">
         <div class="big-price" id="lblPrice">---</div>
@@ -484,10 +502,14 @@
 
     async function loadIntelligence() {
       try {
-        const res = await fetch(`/api/intelligence?symbol=${currentSymbol}&tf=H1`);
+        const sym = currentSymbol;
+        const res = await fetch(`/api/intelligence?symbol=${encodeURIComponent(sym)}&tf=H1`);
+        if (!res.ok) throw new Error(`no market data for ${sym}`);
         const d = await res.json();
+        if (sym !== currentSymbol) return;  // user switched symbol while this loaded
         document.getElementById("lblPrice").innerText = px(d.current_price);
-        const feeds = {yahoo: "Yahoo Finance futures, may lag up to ~10 min", bybit: "Bybit spot", mt5: "MetaTrader 5 broker feed"};
+        document.getElementById("lblDataTime").innerText = `Updated ${new Date().toLocaleTimeString()}`;
+        const feeds = {yahoo: "Yahoo Finance, may lag up to ~15 min", bybit: "Bybit spot", mt5: "MetaTrader 5 broker feed"};
         document.getElementById("lblSource").innerText =
           `Price source: ${feeds[d.data_source] || d.data_source || "unknown"} (${d.data_symbol || currentSymbol}), H1 candles`;
 
@@ -510,11 +532,11 @@
         document.getElementById("tagNewsSentiment").className = "tag " + (d.news_sentiment === "BULLISH" ? "tag-bull" : (d.news_sentiment === "BEARISH" ? "tag-bear" : "tag-warn"));
         document.getElementById("tagEventRisk").innerText = d.event_risk_action;
         document.getElementById("lblNewsSummary").innerText = d.news_summary || "No news summary.";
-      } catch (e) { console.error(e); }
+      } catch (e) { console.error(e); document.getElementById("lblSource").innerText = e.message; }
     }
 
     async function runScan() {
-      const res = await fetch("/api/scan");
+      const res = await fetch(`/api/scan?extra=${encodeURIComponent(currentSymbol)}`);
       if (!res.ok) throw new Error(`scan returned ${res.status}`);
       const scans = await res.json();
       // open tab first; if it has no setup, show a market that does, so its trade button appears
@@ -641,8 +663,9 @@
     function switchSymbol(sym) {
       currentSymbol = sym;
       document.querySelectorAll(".sym-tab").forEach(btn => {
-        btn.classList.toggle("active", btn.innerText.includes(sym));
+        btn.classList.toggle("active", btn.dataset.sym === sym);
       });
+      document.getElementById("lblPrice").innerText = "---";
       loadIntelligence();
       runScan();
       runBacktest();
@@ -674,6 +697,57 @@
     loadPositions();
     runBacktest();
     setInterval(() => { loadStatus(); loadPositions(); }, 10000);
+    // the live stream only covers the watchlist; refresh a searched symbol's price every 30 s instead
+    setInterval(async () => {
+      if (watchlist.includes(currentSymbol)) return;
+      const sym = currentSymbol;
+      const d = await (await fetch(`/api/intelligence?symbol=${encodeURIComponent(sym)}&tf=H1&llm=false`)).json();
+      if (sym === currentSymbol && d.current_price) {
+        document.getElementById("lblPrice").innerText = px(d.current_price);
+        document.getElementById("lblDataTime").innerText = `Updated ${new Date().toLocaleTimeString()}`;
+      }
+    }, 30000);
+
+    // ---- symbol search: any stock, index, forex pair, commodity or crypto Yahoo knows ----
+    const watchlist = ["XAUUSD", "XAGUSD", "USOUSD", "SPX500"];
+    let searchTimer = null;
+    function pickSymbol(sym, name) {
+      document.getElementById("searchResults").hidden = true;
+      document.getElementById("symSearch").value = "";
+      if (![...document.querySelectorAll(".sym-tab")].some(b => b.dataset.sym === sym)) {
+        const b = document.createElement("button");
+        b.className = "sym-tab"; b.dataset.sym = sym;
+        b.textContent = name ? `${name.slice(0, 22)} · ${sym}` : sym;
+        b.onclick = () => switchSymbol(sym);
+        document.getElementById("tabContainer").appendChild(b);
+      }
+      switchSymbol(sym);
+    }
+    async function searchSymbols(q) {
+      const box = document.getElementById("searchResults");
+      if (!q.trim()) { box.hidden = true; return; }
+      const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`), list = await r.json();
+      if (document.getElementById("symSearch").value !== q) return;  // a newer keystroke won
+      box.innerHTML = !r.ok ? `<div class="sr-empty err">${esc(list.error)}</div>`
+        : list.length ? list.map(x => `<button class="sr-item" data-sym="${esc(x.symbol)}" data-name="${esc(x.name)}">
+            <strong>${esc(x.symbol)}</strong><span>${esc(x.name)}</span><em>${esc(x.exchange)} · ${esc(x.type)}</em></button>`).join("")
+        : '<div class="sr-empty">No match. Press Enter to try it as a ticker.</div>';
+      box.hidden = false;
+    }
+    document.getElementById("symSearch").addEventListener("input", e => {
+      clearTimeout(searchTimer); searchTimer = setTimeout(() => searchSymbols(e.target.value), 300);
+    });
+    document.getElementById("symSearch").addEventListener("keydown", e => {
+      if (e.key === "Enter" && e.target.value.trim()) {
+        const first = document.querySelector("#searchResults:not([hidden]) .sr-item");
+        first ? pickSymbol(first.dataset.sym, first.dataset.name) : pickSymbol(e.target.value.trim().toUpperCase(), "");
+      }
+      if (e.key === "Escape") document.getElementById("searchResults").hidden = true;
+    });
+    document.getElementById("searchResults").addEventListener("click", e => {
+      const b = e.target.closest(".sr-item"); if (b) pickSymbol(b.dataset.sym, b.dataset.name);
+    });
+    document.addEventListener("click", e => { if (!e.target.closest(".search")) document.getElementById("searchResults").hidden = true; });
   </script>
 </body>
 </html>

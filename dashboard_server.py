@@ -6,7 +6,10 @@ from contextlib import asynccontextmanager
 from dataclasses import asdict
 import json
 import os
+import re
 from typing import Any
+import urllib.parse
+import urllib.request
 import uvicorn
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
@@ -28,7 +31,7 @@ from orchestrator import AutonomousTradingOrchestrator
 from rag_kb import add_document, get_all_documents, search_knowledge_base
 from risk_engine import RiskEngine
 from streamer import stream_manager
-from universal_data import fetch_universal_candles
+from universal_data import USER_AGENT, fetch_universal_candles
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 HTML_PATH = os.path.join(WEB_DIR, "index.html")
@@ -210,10 +213,32 @@ def api_intelligence(request):  # sync: Starlette runs it in a worker thread
     return JSONResponse(report)
 
 
+SYMBOL_RE = re.compile(r"^[A-Za-z0-9.=^&-]{1,24}$")  # Yahoo/Bybit tickers: RELIANCE.NS, EURUSD=X, ^NSEI, BTC-USD
+
+
+def api_search(request):  # sync: Starlette runs it in a worker thread
+    """Find any tradable symbol by name or ticker (Yahoo Finance search)."""
+    q = request.query_params.get("q", "").strip()[:40]
+    if not q:
+        return JSONResponse([])
+    url = ("https://query2.finance.yahoo.com/v1/finance/search?quotesCount=8&newsCount=0&q="
+           + urllib.parse.quote(q))
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": USER_AGENT}), timeout=8) as r:
+            quotes = json.loads(r.read().decode()).get("quotes", [])
+    except Exception as e:
+        return JSONResponse({"error": f"Search failed: {e}"}, status_code=502)
+    return JSONResponse([{"symbol": x["symbol"], "name": x.get("shortname") or x.get("longname") or "",
+                          "exchange": x.get("exchDisp", ""), "type": x.get("quoteType", "")}
+                         for x in quotes if x.get("symbol") and SYMBOL_RE.match(x["symbol"])])
+
+
 def api_scan(request):  # sync: Starlette runs it in a worker thread
-    """System 2 Strategy scan across watchlist."""
+    """System 2 Strategy scan across the watchlist, plus the symbol open on the page if it isn't in it."""
+    extra = request.query_params.get("extra", "").strip()
+    symbols = list(WATCHLIST) + ([extra] if extra and SYMBOL_RE.match(extra) and extra not in WATCHLIST else [])
     results = []
-    for s in WATCHLIST:
+    for s in symbols:
         try:
             res = orchestrator.run_single_cycle(s, execute=False)
             results.append(res)
@@ -332,6 +357,7 @@ routes = [
     Route("/api/positions", api_positions),
     Route("/api/trades", api_trades),
     Route("/api/history", api_history),
+    Route("/api/search", api_search),
     Route("/api/emergency_stop", api_emergency_stop, methods=["POST"]),
     Route("/api/resume", api_resume, methods=["POST"]),
     Route("/api/execute", api_execute, methods=["POST"]),

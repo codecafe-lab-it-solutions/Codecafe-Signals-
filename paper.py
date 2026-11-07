@@ -49,7 +49,6 @@ def daily_pnl():
 
 
 def last_price(symbol):
-    # shortcut: Bybit drops the forming candle, so a crypto price can be up to 15 min old; use a live ticker if that matters
     return float(fetch(symbol, "M15", 50)["close"][-1])
 
 

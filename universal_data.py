@@ -96,7 +96,7 @@ def fetch_universal_candles(symbol: str, timeframe: str = "H1", count: int = 100
     if symbol.upper().endswith("USDT"):
         try:
             import bybit
-            k = bybit.klines(symbol.upper(), timeframe, count)
+            k = bybit.klines(symbol.upper(), timeframe, count, closed=False)  # live last price, like Yahoo
             k["symbol"] = symbol.upper()
             k["interval"] = timeframe
             k["source"] = "bybit"
