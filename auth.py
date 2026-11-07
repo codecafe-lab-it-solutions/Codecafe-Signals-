@@ -76,21 +76,42 @@ def login(name, password):
 
 
 def make_token(name):
-    payload = f"{name}|{int(time.time()) + SESSION_DAYS * 86400}"
-    return payload + "|" + hmac.new(SECRET, payload.encode(), hashlib.sha256).hexdigest()
+    now = int(time.time())
+    payload = f"{name}|{now}|{now + SESSION_DAYS * 86400}"
+    sig = hmac.new(SECRET, payload.encode(), hashlib.sha256).hexdigest()
+    return f"{payload}|{sig}"
 
 
 def read_token(token):
     """Return (name, role) for a valid, unexpired session cookie of a user who still exists, else None."""
     try:
-        name, exp, sig = (token or "").split("|")
-    except ValueError:
+        parts = (token or "").split("|")
+        if len(parts) == 4:
+            name, iat_s, exp_s, sig = parts
+            iat = int(iat_s)
+            exp = int(exp_s)
+            payload = f"{name}|{iat_s}|{exp_s}"
+        elif len(parts) == 3:
+            name, exp_s, sig = parts
+            iat = 0
+            exp = int(exp_s)
+            payload = f"{name}|{exp_s}"
+        else:
+            return None
+    except (ValueError, TypeError):
         return None
-    good = hmac.new(SECRET, f"{name}|{exp}".encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(sig, good) or int(exp) < time.time():
+
+    good = hmac.new(SECRET, payload.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, good) or exp < time.time():
         return None
     u = users().get(name)
-    return (name, u["role"]) if u else None
+    if not u:
+        return None
+    # If password was changed after this token was issued, invalidate it
+    changed = int(u.get("changed", 0))
+    if changed and iat < changed:
+        return None
+    return (name, u["role"])
 
 
 def bootstrap():

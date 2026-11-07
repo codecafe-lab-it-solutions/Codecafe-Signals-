@@ -110,7 +110,8 @@ def positions():
 
 
 def close_trade(trade_id, price=None):
-    is_open = lambda t: t["id"] == trade_id and t["status"] == "OPEN"  # noqa: E731
+    raw_id = int(str(trade_id).split("-")[-1])
+    is_open = lambda t: t["id"] == raw_id and t["status"] == "OPEN"  # noqa: E731
     t = next((t for t in load()["trades"] if is_open(t)), None)
     if not t:
         raise ValueError(f"No open paper trade {trade_id}")

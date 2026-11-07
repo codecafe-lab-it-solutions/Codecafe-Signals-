@@ -536,14 +536,13 @@
     }
 
     async function runScan() {
-      const res = await fetch(`/api/scan?extra=${encodeURIComponent(currentSymbol)}`);
+      const sym = currentSymbol;
+      const res = await fetch(`/api/scan?extra=${encodeURIComponent(sym)}`);
       if (!res.ok) throw new Error(`scan returned ${res.status}`);
       const scans = await res.json();
-      // open tab first; if it has no setup, show a market that does, so its trade button appears
       const tradable = s => ["BUY", "SELL"].includes(s.signal?.action);
-      const match = scans.find(s => s.symbol === currentSymbol && tradable(s)) || scans.find(tradable)
-        || scans.find(s => s.symbol === currentSymbol) || scans[0];
-      if (match && match.signal) {
+      const match = scans.find(s => s.symbol === sym);  // the card always shows the open tab
+      if (sym === currentSymbol && match && match.signal) {  // skip if the user switched tab mid-scan
         latestSignal = match.signal;
         const act = match.signal.action;
         document.getElementById("lblSignalAction").innerText = `${act} ${match.symbol}`;
@@ -553,12 +552,14 @@
         document.getElementById("lblTP").innerText = px(match.signal.tp);
         document.getElementById("lblConfidence").innerText = `Confidence: ${(match.signal.confidence * 100).toFixed(0)}%`;
         document.getElementById("lblReasons").innerText = match.signal.reasons.join(" | ");
-        document.getElementById("btnExecuteTrade").style.display = (act === "BUY" || act === "SELL") ? "block" : "none";
+        document.getElementById("btnExecuteTrade").style.display = tradable(match) ? "block" : "none";
       }
       loadPositions();
+      const others = scans.filter(s => s.symbol !== sym && tradable(s)).map(s => `${s.symbol} ${s.signal.action}`);
       return `Scanned ${scans.length} markets at ${new Date().toLocaleTimeString()}: ` +
         scans.map(s => `${s.symbol} ${s.error ? "error" : (s.signal?.action ?? "?")}`).join(", ") +
-        (match && tradable(match) ? `. ${match.symbol} ${match.signal.action} is on the signal card: press Execute Paper Trade.` : ". No trade setup right now.");
+        (match && tradable(match) ? `. ${sym} ${match.signal.action} is on the signal card: press Execute Paper Trade.` : `. No setup on ${sym} right now.`) +
+        (others.length ? ` Setups elsewhere: ${others.join(", ")} (open its tab to trade).` : "");
     }
 
     async function executeCurrentSignal() {
@@ -592,13 +593,13 @@
       }
       tbody.innerHTML = positions.map(p => `
         <tr>
-          <td>#${p.ticket}</td>
-          <td><strong>${p.symbol}</strong></td>
-          <td style="color:${p.side === 'BUY' ? 'var(--green)' : 'var(--red)'}; font-weight:700;">${p.side}</td>
-          <td>${p.qty}</td>
+          <td>#${esc(p.ticket)}</td>
+          <td><strong>${esc(p.symbol)}</strong></td>
+          <td style="color:${p.side === 'BUY' ? 'var(--green)' : 'var(--red)'}; font-weight:700;">${esc(p.side)}</td>
+          <td>${esc(p.qty)}</td>
           <td>${px(p.open_price)}</td>
           <td style="color:${p.profit >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:600;">${p.profit >= 0 ? '+' : ''}${Number(p.profit).toFixed(2)}</td>
-          <td><button class="btn btn-red" style="padding:3px 8px; font-size:11px;" onclick="closePosition('${p.ticket}')">Close</button></td>
+          <td><button class="btn btn-red" style="padding:3px 8px; font-size:11px;" onclick="closePosition('${esc(p.ticket)}')">Close</button></td>
         </tr>
       `).join("");
     }

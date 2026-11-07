@@ -14,7 +14,7 @@ import uvicorn
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
+from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
@@ -37,7 +37,49 @@ WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 HTML_PATH = os.path.join(WEB_DIR, "index.html")
 LOGIN_PATH = os.path.join(WEB_DIR, "login.html")
 COOKIE = "yo_session"
-PUBLIC = ("/login", "/api/login", "/healthz")
+PUBLIC = ("/login", "/api/login", "/healthz", "/robots.txt", "/favicon.ico")
+
+_login_attempts: dict[str, list[float]] = {}
+
+
+def _check_rate_limit(ip: str, max_attempts: int = 5, window_seconds: float = 60.0) -> bool:
+    import time
+    now = time.time()
+    attempts = [t for t in _login_attempts.get(ip, []) if now - t < window_seconds]
+    _login_attempts[ip] = attempts
+    return len(attempts) < max_attempts
+
+
+def _record_failed_attempt(ip: str) -> None:
+    import time
+    now = time.time()
+    attempts = [t for t in _login_attempts.get(ip, []) if now - t < 60.0]
+    attempts.append(now)
+    _login_attempts[ip] = attempts
+
+
+def _clear_rate_limit(ip: str) -> None:
+    _login_attempts.pop(ip, None)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Adds standard security headers to all responses."""
+
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' ws: wss:; "
+            "frame-ancestors 'self';"
+        )
+        return response
 
 broker = get_broker(TRADING_MODE)
 auth.bootstrap()
@@ -84,12 +126,17 @@ async def login_page(request):
 
 
 async def api_login(request):
+    client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (request.client.host if request.client else "127.0.0.1")
+    if not _check_rate_limit(client_ip):
+        return JSONResponse({"error": "Too many failed login attempts. Please wait 60 seconds."}, status_code=429, headers={"Retry-After": "60"})
     body = await request.json()
     name = str(body.get("username", "")).strip().lower()
     role = auth.login(name, str(body.get("password", "")))
     if not role:
+        _record_failed_attempt(client_ip)
         await asyncio.sleep(1)  # slows password guessing
         return JSONResponse({"error": "Wrong username or password."}, status_code=401)
+    _clear_rate_limit(client_ip)
     resp = JSONResponse({"ok": True, "user": name, "role": role})
     resp.set_cookie(COOKIE, auth.make_token(name), max_age=auth.SESSION_DAYS * 86400, httponly=True,
                     samesite="lax", secure=request.url.scheme == "https")  # https behind Render's proxy via proxy_headers
@@ -143,8 +190,11 @@ async def api_admin_users(request):
 async def api_coach(request):
     """Screen coach: one shared screen frame in, one trade plan out."""
     body = await request.json()
+    img_data = body.get("image", "")
+    if len(img_data) > 10 * 1024 * 1024:
+        return JSONResponse({"error": "Image payload too large (max 10MB)."}, status_code=413)
     try:
-        plan = await asyncio.to_thread(coach.analyze, body["image"], str(body.get("symbol", "")).strip(),
+        plan = await asyncio.to_thread(coach.analyze, img_data, str(body.get("symbol", "")).strip(),
                                        str(body.get("note", "")).strip()[:500])
         return JSONResponse(plan)
     except (ValueError, KeyError) as e:
@@ -299,6 +349,24 @@ async def api_execute(request):
         tp = float(body.get("tp", 0.0)) if body.get("tp") else None
         price = float(body.get("price", 0.0)) if body.get("price") else None
 
+        if not price and sym:
+            try:
+                price = float(fetch_universal_candles(sym, "M15", 10)["close"][-1])
+            except Exception:
+                price = 0.0
+
+        risk_res = risk.validate_trade(
+            broker=broker,
+            symbol=sym,
+            side=side,
+            entry=price or sl,
+            sl=sl,
+            tp=tp,
+            check_news=False,
+        )
+        if not risk_res.allowed:
+            return JSONResponse({"ok": False, "error": risk_res.reason}, status_code=400)
+
         req = OrderRequest(symbol=sym, side=side, qty=qty, sl=sl, tp=tp, price=price)
         res = await asyncio.to_thread(broker.submit_order, req)
         return JSONResponse(asdict(res))
@@ -338,9 +406,19 @@ async def lifespan(app):
     stream_task.cancel()
 
 
+async def robots_txt(request):
+    return PlainTextResponse("User-agent: *\nDisallow: /api/\nDisallow: /\n")
+
+
+async def favicon(request):
+    return Response(status_code=204)
+
+
 routes = [
     Route("/", serve_index),
     Route("/login", login_page),
+    Route("/robots.txt", robots_txt),
+    Route("/favicon.ico", favicon),
     Route("/healthz", healthz),
     Route("/api/login", api_login, methods=["POST"]),
     Route("/api/logout", api_logout, methods=["POST"]),
@@ -366,7 +444,10 @@ routes = [
     Route("/api/ml/train", admin_only(api_ml_train), methods=["POST"]),
 ]
 
-middleware = [Middleware(AuthMiddleware)]  # same-origin only: no CORS, so other sites can't use a client's cookie
+middleware = [
+    Middleware(SecurityHeadersMiddleware),
+    Middleware(AuthMiddleware),
+]  # same-origin only: no CORS, so other sites can't use a client's cookie
 
 app = Starlette(debug=False, routes=routes, middleware=middleware, lifespan=lifespan)
 

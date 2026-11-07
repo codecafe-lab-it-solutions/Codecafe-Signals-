@@ -106,7 +106,11 @@ class RiskEngine:
         except Exception as e:
             return RiskValidationResult(False, f"Refused: Broker account query failed: {e}", 0.0, 0.0, 0.0)
 
-        daily_loss = db.get_daily_realized_pnl()
+        if broker.name == "paper":
+            import paper
+            daily_loss = paper.daily_pnl()
+        else:
+            daily_loss = db.get_daily_realized_pnl()
         max_permitted_loss = -balance * (self.max_daily_loss_pct / 100.0)
         if daily_loss <= max_permitted_loss:
             return RiskValidationResult(False, f"Refused: Daily loss limit reached ({daily_loss:.2f} <= {max_permitted_loss:.2f}).", 0.0, 0.0, 0.0)

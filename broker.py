@@ -136,8 +136,8 @@ class PaperBroker(AbstractBroker):
         import paper
         acct = paper.load()
         bal = acct.get("balance", {}).get(self.currency, self.starting_balance)
-        open_trades = db.get_open_trades(broker=self.name)
-        unrealized = sum(t.get("pnl", 0.0) for t in open_trades)
+        positions = self.get_positions()
+        unrealized = sum(p.profit for p in positions)
         return AccountInfo(
             broker=self.name,
             balance=round(bal, 2),
@@ -153,11 +153,12 @@ class PaperBroker(AbstractBroker):
         report = paper.positions()
         trades = report.get("open", [])
         res = []
+        user_prefix = f"{paper.USER.get()}-" if paper.USER.get() != "local" else ""
         for t in trades:
             if symbol and t["symbol"].upper() != symbol.upper():
                 continue
             res.append(Position(
-                ticket=str(t["id"]),
+                ticket=f"{user_prefix}{t['id']}",
                 symbol=t["symbol"],
                 side=t["side"],
                 qty=float(t["qty"]),
@@ -180,21 +181,22 @@ class PaperBroker(AbstractBroker):
         try:
             res = paper.open_trade(req.symbol, side, req.qty, req.sl, req.tp, price=req.price)
             t = res["trade"]
-            ticket = str(t["id"])
+            user_prefix = f"{paper.USER.get()}-" if paper.USER.get() != "local" else ""
+            ticket = f"{user_prefix}{t['id']}"
             db.record_trade(ticket, self.name, req.symbol, side, req.qty, t["entry"], req.sl, req.tp, status="OPEN", notes=req.comment)
-            db.log_audit("ORDER_FILLED", {"broker": self.name, "ticket": ticket, "symbol": req.symbol, "side": side, "qty": req.qty, "price": t["entry"]})
+            db.log_audit("ORDER_FILLED", {"broker": self.name, "ticket": ticket, "symbol": req.symbol, "side": side, "qty": req.qty, "price": t["entry"], "user": paper.USER.get()})
             return OrderResult(ok=True, ticket=ticket, symbol=req.symbol, side=side, qty=req.qty, price=t["entry"], comment="Filled paper order")
         except Exception as e:
-            db.log_audit("ORDER_REJECTED", {"broker": self.name, "error": str(e)})
+            db.log_audit("ORDER_REJECTED", {"broker": self.name, "error": str(e), "user": paper.USER.get()})
             return OrderResult(ok=False, ticket="", symbol=req.symbol, side=side, qty=req.qty, price=0.0, comment=str(e), error=str(e))
 
     def close_position(self, ticket: str | int) -> OrderResult:
         import paper
         try:
-            res = paper.close_trade(int(ticket))
+            res = paper.close_trade(ticket)
             t = res["trade"]
             db.update_trade_close(ticket, exit_price=t.get("exit", 0.0), pnl=t.get("pnl", 0.0), notes="Paper closed")
-            db.log_audit("POSITION_CLOSED", {"broker": self.name, "ticket": str(ticket), "pnl": t.get("pnl", 0.0)})
+            db.log_audit("POSITION_CLOSED", {"broker": self.name, "ticket": str(ticket), "pnl": t.get("pnl", 0.0), "user": paper.USER.get()})
             return OrderResult(ok=True, ticket=str(ticket), symbol=t["symbol"], side=t["side"], qty=t["qty"], price=t.get("exit", 0.0), comment="Paper trade closed")
         except Exception as e:
             return OrderResult(ok=False, ticket=str(ticket), symbol="", side="", qty=0.0, price=0.0, comment=str(e), error=str(e))
