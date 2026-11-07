@@ -60,6 +60,9 @@
     table.data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
     table.data-table th, table.data-table td { padding: 8px; text-align: left; border-bottom: 1px solid var(--card-border); }
     table.data-table th { color: var(--text-muted); font-weight: 600; }
+    .btn:disabled { opacity: 0.6; cursor: wait; }
+    #toast { position: fixed; right: 16px; bottom: 16px; max-width: min(420px, calc(100vw - 32px)); background: var(--card); color: var(--text);
+             border: 1px solid var(--card-border); border-left: 4px solid var(--green); border-radius: 6px; padding: 10px 14px; font-size: 13px; display: none; z-index: 50; }
     .btn-ghost { background: #1c2230; color: var(--text); border: 1px solid var(--card-border); }
     .field { padding: 8px 10px; border-radius: 6px; border: 1px solid var(--card-border); background: #10141d; color: var(--text); font-size: 13px; min-width: 0; }
     .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -80,7 +83,7 @@
       <div class="stat-pill">Today P&L: <strong id="lblDailyPnl">+$0.00</strong></div>
     </div>
     <div class="row">
-      <button class="btn btn-blue" onclick="runScan()">Scan Watchlist</button>
+      <button class="btn btn-blue" onclick="busy(this, 'Scanning...', runScan)">Scan Watchlist</button>
       <button class="btn btn-red" id="btnKill" onclick="emergencyStop()">Kill Switch</button>
       <button class="btn btn-green" id="btnResume" onclick="resumeTrading()" style="display:none;">Resume trading</button>
       <span class="stat-pill" id="lblUser">...</span>
@@ -201,7 +204,7 @@
       <div class="card">
         <div class="card-title">
           <span>System 2.F: Walk-Forward Backtester</span>
-          <button class="btn btn-blue" style="padding:4px 8px; font-size:11px;" onclick="runBacktest()">Run Backtest (300 Bars)</button>
+          <button class="btn btn-blue" style="padding:4px 8px; font-size:11px;" onclick="busy(this, 'Running...', runBacktest)">Run Backtest (300 Bars)</button>
         </div>
         <div class="metric-grid" id="backtestMetrics">
           <div class="metric-card"><span>Win Rate</span><strong id="btWinRate">--%</strong></div>
@@ -214,6 +217,7 @@
       </div>
     </div>
   </main>
+  <div id="toast" role="status" aria-live="polite"></div>
 
   <script>
     let currentSymbol = "XAUUSD";
@@ -230,6 +234,17 @@
     // display only: 2 decimals for big prices (gold, BTC), 5 for small ones (EURUSD); values sent to the server stay exact
     const px = v => (v === null || v === undefined || v === "" || isNaN(v)) ? String(v ?? "--")
       : Number(v).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: Math.abs(v) < 10 ? 5 : 2});
+    function toast(msg, bad) {
+      const t = document.getElementById("toast");
+      t.textContent = msg; t.style.borderLeftColor = bad ? "var(--red)" : "var(--green)"; t.style.display = "block";
+      clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 7000);
+    }
+    // button feedback: busy label while the request runs, then a toast with the result or the error
+    async function busy(btn, label, fn) {
+      const txt = btn.textContent; btn.disabled = true; btn.textContent = label;
+      try { toast(await fn()); } catch (e) { toast("Failed: " + e.message, true); }
+      btn.disabled = false; btn.textContent = txt;
+    }
     const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
     async function loadMe() {
@@ -385,6 +400,7 @@
 
     async function runScan() {
       const res = await fetch("/api/scan");
+      if (!res.ok) throw new Error(`scan returned ${res.status}`);
       const scans = await res.json();
       const match = scans.find(s => s.symbol === currentSymbol) || scans[0];
       if (match && match.signal) {
@@ -400,6 +416,8 @@
         document.getElementById("btnExecuteTrade").style.display = (act === "BUY" || act === "SELL") ? "block" : "none";
       }
       loadPositions();
+      return `Scanned ${scans.length} markets at ${new Date().toLocaleTimeString()}: ` +
+        scans.map(s => `${s.symbol} ${s.error ? "error" : (s.signal?.action ?? "?")}`).join(", ");
     }
 
     async function executeCurrentSignal() {
@@ -445,6 +463,7 @@
 
     async function runBacktest() {
       const res = await fetch(`/api/backtest?symbol=${currentSymbol}&tf=H1&count=300`);
+      if (!res.ok) throw new Error(`backtest returned ${res.status}`);
       const d = await res.json();
       document.getElementById("btWinRate").innerText = d.win_rate_pct + "%";
       document.getElementById("btPF").innerText = d.profit_factor;
@@ -452,6 +471,8 @@
       document.getElementById("btSharpe").innerText = d.sharpe_ratio;
       document.getElementById("btExp").innerText = d.expectancy_r + "R";
       document.getElementById("btTrades").innerText = d.total_trades;
+      return `Backtest ${currentSymbol} H1, last 300 bars: ${d.total_trades} trades, win rate ${d.win_rate_pct}%, profit factor ${d.profit_factor}. ` +
+        "Same data gives the same numbers until a new candle closes.";
     }
 
     async function emergencyStop() {
