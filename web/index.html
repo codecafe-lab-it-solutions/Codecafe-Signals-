@@ -3,99 +3,195 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CodeCafe Signals — Autonomous Trading Dashboard</title>
+  <title>CodeCafe Signals — Trading Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,600&family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0b0e14;
-      --card: #151922;
-      --card-border: #232936;
-      --text: #e1e4ea;
-      --text-muted: #8b92a2;
-      --green: #22c55e;
-      --green-bg: rgba(34, 197, 94, 0.12);
-      --red: #ef4444;
-      --red-bg: rgba(239, 68, 68, 0.12);
-      --blue: #3b82f6;
-      --amber: #f59e0b;
-      --amber-bg: rgba(245, 158, 11, 0.12);
+      --bg: #0f0c0a;
+      --bg-2: #15110e;
+      --card: #1a1512;
+      --card-2: #211b17;
+      --card-border: #2e2620;
+      --line: #2a231e;
+      --text: #f1e9e1;
+      --text-muted: #9c8f84;
+      --crema: #e0a85e;
+      --crema-bg: rgba(224, 168, 94, 0.12);
+      --green: #4ade80;
+      --green-bg: rgba(74, 222, 128, 0.12);
+      --red: #f87171;
+      --red-bg: rgba(248, 113, 113, 0.12);
+      --blue: #e0a85e;
+      --amber: #fbbf24;
+      --amber-bg: rgba(251, 191, 36, 0.12);
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+      --sans: "Instrument Sans", system-ui, sans-serif;
+      --radius: 12px;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
-    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
-    header { background: #0f131c; border-bottom: 1px solid var(--card-border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
-    .brand { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
-    .brand span { color: var(--blue); }
-    .stats-bar { display: flex; gap: 20px; align-items: center; font-size: 13px; }
-    .stat-pill { background: #1c2230; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--card-border); }
-    .stat-pill strong { color: #fff; margin-left: 4px; }
-    .btn { padding: 8px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; border: none; transition: 0.2s; }
-    .btn-red { background: var(--red); color: #fff; }
-    .btn-red:hover { background: #dc2626; }
-    .btn-blue { background: var(--blue); color: #fff; }
-    .btn-blue:hover { background: #2563eb; }
-    .btn-green { background: var(--green); color: #000; }
-    .btn-green:hover { background: #16a34a; color: #fff; }
-    .main-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; padding: 16px 24px; flex: 1; }
-    @media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr; } }
-    .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-    .card-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
-    .sym-tabs { display: flex; gap: 8px; margin-bottom: 4px; }
-    .sym-tab { padding: 6px 12px; background: #1a202c; border: 1px solid var(--card-border); border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; color: var(--text-muted); }
-    .sym-tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
-    .price-hero { display: flex; align-items: baseline; gap: 12px; }
-    .big-price { font-size: 28px; font-weight: 700; }
-    .tag { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-    .tag-bull { background: var(--green-bg); color: var(--green); }
-    .tag-bear { background: var(--red-bg); color: var(--red); }
-    .tag-warn { background: var(--amber-bg); color: var(--amber); }
-    .info-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    .info-table td { padding: 6px 0; border-bottom: 1px solid #1a202c; }
-    .info-table td:last-child { text-align: right; font-weight: 600; color: #fff; }
-    .signal-box { background: #1a202c; border-radius: 6px; padding: 14px; border-left: 4px solid var(--blue); }
-    .signal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .signal-action { font-size: 20px; font-weight: 700; }
-    .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 12px; }
-    .metric-card { background: #10141d; padding: 8px; border-radius: 6px; text-align: center; }
-    .metric-card span { display: block; color: var(--text-muted); font-size: 10px; margin-bottom: 2px; }
-    .metric-card strong { font-size: 14px; color: #fff; }
-    table.data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    table.data-table th, table.data-table td { padding: 8px; text-align: left; border-bottom: 1px solid var(--card-border); }
-    table.data-table th { color: var(--text-muted); font-weight: 600; }
-    .btn:disabled { opacity: 0.6; cursor: wait; }
-    #toast { position: fixed; right: 16px; bottom: 16px; max-width: min(420px, calc(100vw - 32px)); background: var(--card); color: var(--text);
-             border: 1px solid var(--card-border); border-left: 4px solid var(--green); border-radius: 6px; padding: 10px 14px; font-size: 13px; display: none; z-index: 50; }
-    .btn-ghost { background: #1c2230; color: var(--text); border: 1px solid var(--card-border); }
-    .field { padding: 8px 10px; border-radius: 6px; border: 1px solid var(--card-border); background: #10141d; color: var(--text); font-size: 13px; min-width: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--sans); color: var(--text); min-height: 100vh; font-size: 14px;
+      background:
+        radial-gradient(900px 500px at 85% -10%, rgba(224, 168, 94, 0.10), transparent 60%),
+        radial-gradient(700px 400px at -10% 110%, rgba(224, 168, 94, 0.06), transparent 60%),
+        var(--bg);
+      background-attachment: fixed;
+    }
+    body::before {  /* film grain */
+      content: ""; position: fixed; inset: 0; pointer-events: none; opacity: 0.05; z-index: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    header, main, .ticker-note { position: relative; z-index: 1; }
+
+    /* ---------- header ---------- */
+    header {
+      display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 16px 24px;
+      padding: 14px 28px; border-bottom: 1px solid var(--line);
+      background: linear-gradient(to bottom, rgba(15, 12, 10, 0.92), rgba(15, 12, 10, 0.75));
+      backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 10;
+    }
+    .brand { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+    .brand b { font-family: "Fraunces", serif; font-style: italic; font-weight: 600; font-size: 24px; color: var(--crema); letter-spacing: -0.5px; }
+    .brand span { font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
+    .stats-bar { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+    .stat-pill { display: flex; flex-direction: column; padding: 4px 14px; border-left: 1px solid var(--line); font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
+    .stat-pill:first-child { border-left: none; }
+    .stat-pill strong { font-family: var(--mono); font-size: 15px; letter-spacing: 0; text-transform: none; color: var(--text); font-weight: 500; margin-top: 1px; }
+    .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+    .user-chip { font-size: 12px; color: var(--text-muted); padding: 0 4px; }
+    .user-chip strong { color: var(--text); }
+
+    /* ---------- buttons ---------- */
+    .btn { font-family: var(--sans); padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer; border: 1px solid transparent; transition: background 0.15s, transform 0.1s, border-color 0.15s; white-space: nowrap; }
+    .btn:active { transform: translateY(1px); }
+    .btn:disabled { opacity: 0.55; cursor: wait; }
+    .btn:focus-visible, .sym-tab:focus-visible, .seg button:focus-visible { outline: 2px solid var(--crema); outline-offset: 2px; }
+    .btn-blue { background: var(--crema); color: #1a1209; }
+    .btn-blue:hover { background: #ebb872; }
+    .btn-red { background: transparent; color: var(--red); border-color: rgba(248, 113, 113, 0.45); }
+    .btn-red:hover { background: var(--red-bg); }
+    .btn-green { background: var(--green); color: #052e14; }
+    .btn-green:hover { background: #6ee7a0; }
+    .btn-ghost { background: transparent; color: var(--text); border-color: var(--card-border); }
+    .btn-ghost:hover { background: var(--card-2); }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    /* ---------- layout ---------- */
+    .main-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; padding: 20px 28px 40px; max-width: 1480px; margin: 0 auto; }
+    .span-12 { grid-column: span 12; } .span-7 { grid-column: span 7; } .span-5 { grid-column: span 5; } .span-4 { grid-column: span 4; }
+    @media (max-width: 1100px) { .span-7, .span-5, .span-4 { grid-column: span 12; } }
+    @media (max-width: 1100px) { header { grid-template-columns: 1fr; } .stats-bar, .actions { justify-content: flex-start; } }
+    @media (max-width: 640px) { header { padding: 12px 16px; position: static; } .main-grid { padding: 16px; gap: 12px; } .stat-pill { padding: 4px 10px; } }
+
+    .card {
+      background: linear-gradient(180deg, var(--card-2), var(--card)); border: 1px solid var(--card-border); border-radius: var(--radius);
+      padding: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0;
+      animation: rise 0.5s cubic-bezier(.2,.7,.2,1) both;
+    }
+    .card:nth-child(2) { animation-delay: .04s } .card:nth-child(3) { animation-delay: .08s } .card:nth-child(4) { animation-delay: .12s }
+    .card:nth-child(5) { animation-delay: .16s } .card:nth-child(6) { animation-delay: .2s } .card:nth-child(7) { animation-delay: .24s } .card:nth-child(8) { animation-delay: .28s }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .card { animation: none; } }
+    .card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1.6px; color: var(--text-muted); font-weight: 700; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .card-title .num { font-family: var(--mono); color: var(--crema); letter-spacing: 0; margin-right: 8px; }
+
+    /* ---------- market hero ---------- */
+    .sym-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+    .sym-tab { font-family: var(--sans); padding: 7px 12px; background: transparent; border: 1px solid var(--card-border); border-radius: 999px; font-size: 12px; cursor: pointer; font-weight: 600; color: var(--text-muted); transition: 0.15s; }
+    .sym-tab:hover { color: var(--text); border-color: #4a3d33; }
+    .sym-tab.active { background: var(--crema-bg); color: var(--crema); border-color: rgba(224, 168, 94, 0.5); }
+    .price-hero { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .big-price { font-family: var(--mono); font-size: clamp(36px, 6vw, 56px); font-weight: 500; letter-spacing: -2px; line-height: 1; margin-right: 8px; }
+    .source { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .source .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.6); animation: pulse 2s infinite; flex: none; }
+    @keyframes pulse { 70% { box-shadow: 0 0 0 7px rgba(74, 222, 128, 0); } 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); } }
+    #lblDataTime { font-family: var(--mono); font-size: 11px; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
+
+    .tag { padding: 4px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; background: var(--card-2); color: var(--text-muted); border: 1px solid var(--card-border); }
+    .tag-bull { background: var(--green-bg); color: var(--green); border-color: transparent; }
+    .tag-bear { background: var(--red-bg); color: var(--red); border-color: transparent; }
+    .tag-warn { background: var(--amber-bg); color: var(--amber); border-color: transparent; }
+
+    /* ---------- signal ---------- */
+    .signal-box { background: var(--bg-2); border-radius: 10px; padding: 16px; border: 1px solid var(--card-border); border-left: 3px solid var(--crema); }
+    .signal-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .signal-action { font-family: var(--mono); font-size: 22px; font-weight: 600; letter-spacing: -0.5px; }
+    #lblConfidence { font-family: var(--mono); color: var(--crema); letter-spacing: 0; }
+    .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .metric-card { background: var(--card); border: 1px solid var(--line); padding: 10px 12px; border-radius: 8px; min-width: 0; }
+    .metric-card span { display: block; color: var(--text-muted); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+    .metric-card strong { font-family: var(--mono); font-size: 16px; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+    #lblReasons { font-size: 12px; color: var(--text-muted); margin-top: 12px; line-height: 1.5; }
+
+    /* ---------- tables ---------- */
+    .seg { display: inline-flex; background: var(--bg-2); border: 1px solid var(--card-border); border-radius: 999px; padding: 3px; }
+    .seg button { font-family: var(--sans); background: none; border: none; color: var(--text-muted); font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 999px; cursor: pointer; letter-spacing: 0.3px; text-transform: none; }
+    .seg button.active { background: var(--card-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--card-border); }
+    .seg .count { font-family: var(--mono); color: var(--crema); margin-left: 4px; }
+    .table-wrap { overflow-x: auto; margin: 0 -4px; }
+    table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.data-table th { font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--card-border); white-space: nowrap; }
+    table.data-table td { padding: 10px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+    table.data-table tbody tr:hover td { background: rgba(255, 255, 255, 0.02); }
+    table.data-table td.empty { text-align: center; color: var(--text-muted); font-family: var(--sans); padding: 22px; white-space: normal; }
+    td.up { color: var(--green); font-weight: 600; } td.down { color: var(--red); font-weight: 600; } td.dim { color: var(--text-muted); font-family: var(--sans); }
+    #lblHistoryPnl { font-family: var(--mono); font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--text-muted); }
+
+    .info-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .info-table td { padding: 8px 0; border-bottom: 1px dashed var(--line); color: var(--text-muted); vertical-align: top; }
+    .info-table td:last-child { text-align: right; font-family: var(--mono); color: var(--text); padding-left: 12px; overflow-wrap: anywhere; }
+    .info-table tr:last-child td { border-bottom: none; }
+
+    /* ---------- coach ---------- */
+    .coach-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 18px; }
+    @media (max-width: 900px) { .coach-grid { grid-template-columns: 1fr; } }
+    .stage { position: relative; aspect-ratio: 16/9; border-radius: 10px; border: 1px dashed #4a3d33; background: repeating-linear-gradient(135deg, transparent 0 12px, rgba(224, 168, 94, 0.03) 12px 24px), var(--bg-2); overflow: hidden; }
+    .stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; opacity: 0; transition: opacity 0.3s; }
+    .stage.live { border-style: solid; border-color: var(--card-border); }
+    .stage.live video, video[poster] { opacity: 1; }
+    .stage .hint { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 6px; color: var(--text-muted); font-size: 13px; padding: 20px; }
+    .stage .hint b { font-family: "Fraunces", serif; font-style: italic; font-weight: 600; color: var(--crema); font-size: 20px; }
+    .stage.live .hint { display: none; }
+
+    .field { font-family: var(--sans); padding: 9px 12px; border-radius: 8px; border: 1px solid var(--card-border); background: var(--bg-2); color: var(--text); font-size: 13px; min-width: 0; }
+    .field:focus { outline: none; border-color: var(--crema); }
     .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .row .grow { flex: 1 1 160px; }
-    video { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 6px; display: block; }
-    .muted { color: var(--text-muted); font-size: 12px; line-height: 1.5; }
-    .err { color: var(--red); font-size: 12px; }
-    ul.plain { padding-left: 18px; font-size: 12px; line-height: 1.6; }
+    .row .grow { flex: 1 1 180px; }
+    .muted { color: var(--text-muted); font-size: 12.5px; line-height: 1.55; }
+    .err { color: var(--red); font-size: 12.5px; }
+    ul.plain { padding-left: 18px; font-size: 12.5px; line-height: 1.6; }
+    #lblNewsSummary { font-size: 13px; line-height: 1.6; color: #d8cdc3; }
+
+    #toast { position: fixed; right: 20px; bottom: 20px; max-width: min(440px, calc(100vw - 32px)); background: var(--card-2); color: var(--text);
+             border: 1px solid var(--card-border); border-left: 3px solid var(--green); border-radius: 10px; padding: 12px 16px; font-size: 13px; line-height: 1.5;
+             display: none; z-index: 50; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
   </style>
 </head>
 <body>
   <header>
-    <div class="brand">CODECAFE SIGNALS <span>AUTONOMOUS</span></div>
+    <div class="brand"><b>CodeCafe Signals</b><span>Paper trading desk</span></div>
     <div class="stats-bar">
-      <div class="stat-pill">Broker: <strong id="lblBroker">PAPER</strong></div>
-      <div class="stat-pill">Balance: <strong id="lblBalance">$10,000.00</strong></div>
-      <div class="stat-pill">Equity: <strong id="lblEquity">$10,000.00</strong></div>
-      <div class="stat-pill">Today P&L: <strong id="lblDailyPnl">+$0.00</strong></div>
+      <div class="stat-pill">Broker <strong id="lblBroker">PAPER</strong></div>
+      <div class="stat-pill">Balance <strong id="lblBalance">$10,000.00</strong></div>
+      <div class="stat-pill">Equity <strong id="lblEquity">$10,000.00</strong></div>
+      <div class="stat-pill">Today P&amp;L <strong id="lblDailyPnl">+$0.00</strong></div>
     </div>
-    <div class="row">
+    <div class="actions">
       <button class="btn btn-blue" onclick="busy(this, 'Scanning...', runScan)">Scan Watchlist</button>
       <button class="btn btn-red" id="btnKill" onclick="emergencyStop()">Kill Switch</button>
       <button class="btn btn-green" id="btnResume" onclick="resumeTrading()" style="display:none;">Resume trading</button>
-      <span class="stat-pill" id="lblUser">...</span>
-      <button class="btn btn-ghost" id="btnPassword" onclick="changePassword()">Password</button>
-      <button class="btn btn-ghost" id="btnAdmin" onclick="toggleAdmin()" style="display:none;">Clients</button>
-      <button class="btn btn-ghost" onclick="logout()">Log out</button>
+      <span class="user-chip" id="lblUser">...</span>
+      <button class="btn btn-ghost btn-sm" id="btnPassword" onclick="changePassword()">Password</button>
+      <button class="btn btn-ghost btn-sm" id="btnAdmin" onclick="toggleAdmin()" style="display:none;">Clients</button>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Log out</button>
     </div>
   </header>
 
   <main class="main-grid">
     <!-- Admin: client logins (admins only) -->
-    <div class="card" id="adminCard" style="display:none; grid-column: 1 / -1;">
+    <div class="card span-12" id="adminCard" style="display:none;">
       <div class="card-title">Client logins (admin)</div>
       <div class="row">
         <input class="field grow" id="newUser" placeholder="New username (e.g. client1)" autocomplete="off">
@@ -104,115 +200,129 @@
         <button class="btn btn-green" onclick="createUser()">Create login</button>
       </div>
       <div class="err" id="adminMsg"></div>
-      <table class="data-table"><thead><tr><th>Username</th><th>Role</th><th>Created</th><th></th></tr></thead><tbody id="tblUsers"></tbody></table>
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Username</th><th>Role</th><th>Created</th><th></th></tr></thead><tbody id="tblUsers"></tbody></table></div>
       <p class="muted">Give each client their username and temporary password; they change it with the Password button after logging in. The demo role is for pitching: it can't change its password.</p>
     </div>
 
-    <!-- LEFT: System 1 Market Intelligence -->
-    <div style="display:flex; flex-direction:column; gap:16px;">
-      <!-- Screen Coach -->
-      <div class="card">
-        <div class="card-title"><span>Screen Coach: share any trading screen</span></div>
-        <video id="video" autoplay muted playsinline></video>
-        <div class="row">
-          <button class="btn btn-blue" id="btnShare" onclick="shareScreen()">Share trading screen</button>
-          <button class="btn btn-ghost" id="btnAnalyze" onclick="analyzeScreen()" disabled>Analyse now</button>
-        </div>
-        <div class="row">
-          <input class="field grow" id="coachSymbol" placeholder="Symbol for live data + news (optional): BTCUSDT, EURUSD, RELIANCE.NS">
-          <input class="field grow" id="coachNote" placeholder="Note (optional)">
-        </div>
-        <div id="coachPlan" class="muted">Pick the tab or window with your broker or chart (Zerodha, Bybit, Binance, MT5, TradingView...). You log in there as usual; this site never sees your broker password.</div>
+    <!-- Market -->
+    <div class="card span-7">
+      <div class="card-title"><span><span class="num">01</span>Market</span><span id="lblDataTime">Connecting...</span></div>
+      <div class="sym-tabs" id="tabContainer">
+        <button class="sym-tab active" onclick="switchSymbol('XAUUSD')">Gold · XAUUSD</button>
+        <button class="sym-tab" onclick="switchSymbol('XAGUSD')">Silver · XAGUSD</button>
+        <button class="sym-tab" onclick="switchSymbol('USOUSD')">Crude Oil · USOUSD</button>
+        <button class="sym-tab" onclick="switchSymbol('SPX500')">S&amp;P 500 · SPX500</button>
       </div>
-      <div class="card">
-        <div class="card-title">
-          <span>Watchlist & Live Quotes</span>
-          <span id="lblDataTime" style="font-size:11px; text-transform:none;">Live Feeds</span>
-        </div>
-        <div class="sym-tabs" id="tabContainer">
-          <button class="sym-tab active" onclick="switchSymbol('XAUUSD')">Gold (XAUUSD)</button>
-          <button class="sym-tab" onclick="switchSymbol('XAGUSD')">Silver (XAGUSD)</button>
-          <button class="sym-tab" onclick="switchSymbol('USOUSD')">Crude Oil (USOUSD)</button>
-          <button class="sym-tab" onclick="switchSymbol('SPX500')">S&P 500 (SPX500)</button>
-        </div>
-        <div class="price-hero">
-          <div class="big-price" id="lblPrice">---</div>
-          <div class="tag" id="tagDirection">BULLISH</div>
-          <div class="tag tag-warn" id="tagRegime">STRONG_TREND</div>
-        </div>
-        <table class="info-table">
-          <tr><td>Volatility Condition</td><td id="lblVolatility">Normal</td></tr>
-          <tr><td>ADX Trend Strength</td><td id="lblADX">--</td></tr>
-          <tr><td>ML Barrier Win Odds</td><td id="lblMLOdds">--%</td></tr>
-          <tr><td>Candlestick Patterns</td><td id="lblCandlePatterns">None</td></tr>
-          <tr><td>Support Levels</td><td id="lblSupport">--</td></tr>
-          <tr><td>Resistance Levels</td><td id="lblResistance">--</td></tr>
-          <tr><td>Fair Value Gaps (FVG)</td><td id="lblFVG">--</td></tr>
-          <tr><td>Order Blocks</td><td id="lblOrderBlocks">--</td></tr>
-          <tr><td>RAG Strategy Rules</td><td id="lblKBRules">--</td></tr>
-        </table>
+      <div class="price-hero">
+        <div class="big-price" id="lblPrice">---</div>
+        <div class="tag" id="tagDirection">--</div>
+        <div class="tag tag-warn" id="tagRegime">--</div>
       </div>
+      <div class="source"><span class="dot"></span><span id="lblSource">Price source: loading...</span></div>
+    </div>
 
-      <!-- Macro Intelligence & News Card -->
-      <div class="card">
-        <div class="card-title">System 1.D: Macro & News Intelligence (Groq LLM)</div>
-        <div style="display:flex; gap:10px; align-items:center;">
-          <div class="tag" id="tagNewsSentiment">NEUTRAL</div>
-          <div class="tag tag-warn" id="tagEventRisk">TRADE_PERMITTED</div>
+    <!-- Strategy signal -->
+    <div class="card span-5">
+      <div class="card-title"><span><span class="num">02</span>Strategy signal</span><span id="lblConfidence">Confidence: --%</span></div>
+      <div class="signal-box" id="signalBox">
+        <div class="signal-header">
+          <div class="signal-action" id="lblSignalAction">SCANNING...</div>
+          <button class="btn btn-green" id="btnExecuteTrade" onclick="executeCurrentSignal()" style="display:none;">Execute Paper Trade</button>
         </div>
-        <p id="lblNewsSummary" style="font-size:12px; color:#c9d1d9; line-height:1.5;">Scraping news headlines...</p>
-        <div id="lblTopEvents" style="font-size:11px; color:var(--text-muted);"></div>
+        <div class="metric-grid">
+          <div class="metric-card"><span>Entry</span><strong id="lblEntry">--</strong></div>
+          <div class="metric-card"><span>Stop Loss</span><strong id="lblSL">--</strong></div>
+          <div class="metric-card"><span>Take Profit</span><strong id="lblTP">--</strong></div>
+        </div>
+        <p id="lblReasons">Evaluating market setups...</p>
       </div>
     </div>
 
-    <!-- RIGHT: System 2 Strategy & System 3 Execution -->
-    <div style="display:flex; flex-direction:column; gap:16px;">
-      <!-- Active Strategy Signal -->
-      <div class="card">
-        <div class="card-title">
-          <span>System 2: Strategy Signal & Risk Sizing</span>
-          <span id="lblConfidence">Confidence: --%</span>
-        </div>
-        <div class="signal-box" id="signalBox">
-          <div class="signal-header">
-            <div class="signal-action" id="lblSignalAction">SCANNING...</div>
-            <button class="btn btn-green" id="btnExecuteTrade" onclick="executeCurrentSignal()" style="display:none;">Execute Paper Trade</button>
-          </div>
-          <div class="metric-grid">
-            <div class="metric-card"><span>Entry</span><strong id="lblEntry">--</strong></div>
-            <div class="metric-card"><span>Stop Loss</span><strong id="lblSL">--</strong></div>
-            <div class="metric-card"><span>Take Profit</span><strong id="lblTP">--</strong></div>
-          </div>
-          <p id="lblReasons" style="font-size:11px; color:var(--text-muted); margin-top:8px;">Evaluating market setups...</p>
-        </div>
+    <!-- Positions + history -->
+    <div class="card span-12">
+      <div class="card-title">
+        <span><span class="num">03</span>Trades</span>
+        <span class="seg" role="tablist">
+          <button data-tab="open" class="active" onclick="showTab('open')">Open positions</button>
+          <button data-tab="history" onclick="showTab('history')">History<span class="count" id="lblHistoryCount">0</span></button>
+        </span>
       </div>
-
-      <!-- Open Positions -->
-      <div class="card">
-        <div class="card-title">System 3: Active Open Positions</div>
+      <div id="paneOpen" class="table-wrap">
         <table class="data-table">
-          <thead>
-            <tr><th>Ticket</th><th>Symbol</th><th>Side</th><th>Size</th><th>Entry</th><th>P&L</th><th>Action</th></tr>
-          </thead>
-          <tbody id="tblPositions">
-            <tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No open positions</td></tr>
-          </tbody>
+          <thead><tr><th>Ticket</th><th>Symbol</th><th>Side</th><th>Size</th><th>Entry</th><th>P&amp;L</th><th>Action</th></tr></thead>
+          <tbody id="tblPositions"><tr><td colspan="7" class="empty">No open positions</td></tr></tbody>
         </table>
       </div>
+      <div id="paneHistory" class="table-wrap" hidden>
+        <p id="lblHistoryPnl" style="margin:0 4px 8px"></p>
+        <table class="data-table">
+          <thead><tr><th>Ticket</th><th>Symbol</th><th>Side</th><th>Size</th><th>Entry</th><th>Exit</th><th>P&amp;L</th><th>Result</th><th>Opened</th><th>Closed</th></tr></thead>
+          <tbody id="tblHistory"><tr><td colspan="10" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
 
-      <!-- Backtest Quick Runner -->
-      <div class="card">
-        <div class="card-title">
-          <span>System 2.F: Walk-Forward Backtester</span>
-          <button class="btn btn-blue" style="padding:4px 8px; font-size:11px;" onclick="busy(this, 'Running...', runBacktest)">Run Backtest (300 Bars)</button>
+    <!-- Market details -->
+    <div class="card span-4">
+      <div class="card-title"><span><span class="num">04</span>Market details</span></div>
+      <table class="info-table">
+        <tr><td>Volatility</td><td id="lblVolatility">--</td></tr>
+        <tr><td>ADX trend strength</td><td id="lblADX">--</td></tr>
+        <tr><td>ML win odds</td><td id="lblMLOdds">--%</td></tr>
+        <tr><td>Candle patterns</td><td id="lblCandlePatterns">None</td></tr>
+        <tr><td>Support</td><td id="lblSupport">--</td></tr>
+        <tr><td>Resistance</td><td id="lblResistance">--</td></tr>
+        <tr><td>Fair value gaps</td><td id="lblFVG">--</td></tr>
+        <tr><td>Order blocks</td><td id="lblOrderBlocks">--</td></tr>
+        <tr><td>Strategy rules</td><td id="lblKBRules">--</td></tr>
+      </table>
+    </div>
+
+    <!-- News -->
+    <div class="card span-4">
+      <div class="card-title"><span><span class="num">05</span>News &amp; events</span></div>
+      <div class="row">
+        <div class="tag" id="tagNewsSentiment">NEUTRAL</div>
+        <div class="tag tag-warn" id="tagEventRisk">--</div>
+      </div>
+      <p id="lblNewsSummary">Reading news headlines...</p>
+      <div id="lblTopEvents" class="muted"></div>
+    </div>
+
+    <!-- Backtest -->
+    <div class="card span-4">
+      <div class="card-title">
+        <span><span class="num">06</span>Backtest · last 300 H1 bars</span>
+        <button class="btn btn-ghost btn-sm" onclick="busy(this, 'Running...', runBacktest)">Run Backtest (300 Bars)</button>
+      </div>
+      <div class="metric-grid" id="backtestMetrics">
+        <div class="metric-card"><span>Win rate</span><strong id="btWinRate">--%</strong></div>
+        <div class="metric-card"><span>Profit factor</span><strong id="btPF">--</strong></div>
+        <div class="metric-card"><span>Max drawdown</span><strong id="btDD">--%</strong></div>
+        <div class="metric-card"><span>Sharpe</span><strong id="btSharpe">--</strong></div>
+        <div class="metric-card"><span>Expectancy</span><strong id="btExp">--R</strong></div>
+        <div class="metric-card"><span>Trades</span><strong id="btTrades">--</strong></div>
+      </div>
+    </div>
+
+    <!-- Screen Coach -->
+    <div class="card span-12">
+      <div class="card-title"><span><span class="num">07</span>Screen Coach · share any trading screen</span></div>
+      <div class="coach-grid">
+        <div class="stage" id="coachStage">
+          <video id="video" autoplay muted playsinline></video>
+          <div class="hint"><b>Share a chart, get a plan</b>Zerodha, Bybit, Binance, MT5, TradingView: any tab or window.</div>
         </div>
-        <div class="metric-grid" id="backtestMetrics">
-          <div class="metric-card"><span>Win Rate</span><strong id="btWinRate">--%</strong></div>
-          <div class="metric-card"><span>Profit Factor</span><strong id="btPF">--</strong></div>
-          <div class="metric-card"><span>Max Drawdown</span><strong id="btDD">--%</strong></div>
-          <div class="metric-card"><span>Sharpe Ratio</span><strong id="btSharpe">--</strong></div>
-          <div class="metric-card"><span>Expectancy</span><strong id="btExp">--R</strong></div>
-          <div class="metric-card"><span>Total Trades</span><strong id="btTrades">--</strong></div>
+        <div style="display:flex; flex-direction:column; gap:12px; min-width:0;">
+          <div class="row">
+            <button class="btn btn-blue" id="btnShare" onclick="shareScreen()">Share trading screen</button>
+            <button class="btn btn-ghost" id="btnAnalyze" onclick="analyzeScreen()" disabled>Analyse now</button>
+          </div>
+          <div class="row">
+            <input class="field grow" id="coachSymbol" placeholder="Symbol for live data + news (optional): BTCUSDT, EURUSD">
+            <input class="field grow" id="coachNote" placeholder="Note (optional)">
+          </div>
+          <div id="coachPlan" class="muted">You log in to your broker as usual; this site never sees your broker password. Educational ideas only, not financial advice.</div>
         </div>
       </div>
     </div>
@@ -302,8 +412,10 @@
       try {
         stream = await navigator.mediaDevices.getDisplayMedia({video: true, audio: false});
         document.getElementById("video").srcObject = stream;
+        document.getElementById("coachStage").classList.add("live");
         document.getElementById("btnAnalyze").disabled = false;
-        stream.getVideoTracks()[0].onended = () => { stream = null; document.getElementById("btnAnalyze").disabled = true; };
+        stream.getVideoTracks()[0].onended = () => { stream = null; document.getElementById("btnAnalyze").disabled = true;
+          document.getElementById("coachStage").classList.remove("live"); };
       } catch (e) { document.getElementById("coachPlan").innerHTML = '<span class="err">Screen share was cancelled or blocked.</span>'; }
     }
     function grabFrame() {
@@ -375,7 +487,10 @@
         const res = await fetch(`/api/intelligence?symbol=${currentSymbol}&tf=H1`);
         const d = await res.json();
         document.getElementById("lblPrice").innerText = px(d.current_price);
-        
+        const feeds = {yahoo: "Yahoo Finance futures, may lag up to ~10 min", bybit: "Bybit spot", mt5: "MetaTrader 5 broker feed"};
+        document.getElementById("lblSource").innerText =
+          `Price source: ${feeds[d.data_source] || d.data_source || "unknown"} (${d.data_symbol || currentSymbol}), H1 candles`;
+
         const tagDir = document.getElementById("tagDirection");
         tagDir.innerText = d.market_direction;
         tagDir.className = "tag " + (d.market_direction === "BULLISH" ? "tag-bull" : (d.market_direction === "BEARISH" ? "tag-bear" : "tag-warn"));
@@ -448,8 +563,9 @@
       const res = await fetch("/api/positions");
       const positions = await res.json();
       const tbody = document.getElementById("tblPositions");
+      loadHistory();  // after positions: that call settles any SL/TP hits into the history
       if (!positions || positions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No open positions</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">No open positions</td></tr>';
         return;
       }
       tbody.innerHTML = positions.map(p => `
@@ -463,6 +579,35 @@
           <td><button class="btn btn-red" style="padding:3px 8px; font-size:11px;" onclick="closePosition('${p.ticket}')">Close</button></td>
         </tr>
       `).join("");
+    }
+
+    async function loadHistory() {
+      const trades = await (await fetch("/api/history")).json();
+      const why = {STOP_LOSS: "Stop loss hit", TAKE_PROFIT: "Take profit hit", CLOSED: "Closed by you"};
+      const when = s => s ? new Date(s * 1000).toLocaleString([], {dateStyle: "short", timeStyle: "short"}) : "--";
+      const total = trades.reduce((a, t) => a + (t.pnl || 0), 0);
+      document.getElementById("lblHistoryCount").innerText = trades.length;
+      document.getElementById("lblHistoryPnl").innerHTML = trades.length
+        ? `${trades.length} closed · total <span style="color:${total >= 0 ? "var(--green)" : "var(--red)"}">${total >= 0 ? "+" : ""}${total.toFixed(2)}</span>` : "";
+      document.getElementById("tblHistory").innerHTML = trades.length ? trades.map(t => `
+        <tr>
+          <td>#${t.id}</td>
+          <td><strong>${esc(t.symbol)}</strong></td>
+          <td class="${t.side === "BUY" ? "up" : "down"}">${t.side}</td>
+          <td>${t.qty}</td>
+          <td>${px(t.entry)}</td>
+          <td>${px(t.exit)}</td>
+          <td class="${t.pnl >= 0 ? "up" : "down"}">${t.pnl >= 0 ? "+" : ""}${Number(t.pnl).toFixed(2)}</td>
+          <td class="dim">${why[t.status] || esc(t.status)}</td>
+          <td class="dim">${when(t.opened)}</td>
+          <td class="dim">${when(t.closed)}</td>
+        </tr>`).join("") : '<tr><td colspan="10" class="empty">No closed trades yet</td></tr>';
+    }
+
+    function showTab(name) {
+      document.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+      document.getElementById("paneOpen").hidden = name !== "open";
+      document.getElementById("paneHistory").hidden = name !== "history";
     }
 
     async function runBacktest() {

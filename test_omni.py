@@ -124,6 +124,16 @@ assert paper.currency("RELIANCE.NS") == "INR"
 assert paper.daily_pnl() == 50.0  # +105 TP, -105 SL, +50 manual close
 paper.USER.set("someone_else")
 assert paper.load()["balance"]["USD"] == 10000.0  # accounts are separate per login
+# a trade placed while positions() is still fetching prices must survive its save
+paper.open_trade("AAPL", "BUY", 1, sl=100.0, price=150.0)
+def fetch_during_new_trade(*a):
+    if len(paper.load()["trades"]) == 1:
+        paper.open_trade("AAPL", "BUY", 1, sl=100.0, price=150.0)
+    return bars
+paper.fetch = fetch_during_new_trade
+paper.positions()
+paper.fetch = lambda *a: bars
+assert len(paper.load()["trades"]) == 2, paper.load()["trades"]
 paper.USER.set("test")
 
 # UI Dry-run check

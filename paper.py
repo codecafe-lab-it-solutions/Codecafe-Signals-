@@ -8,6 +8,7 @@ sets USER per request. Stop-loss and take-profit are checked against real candle
 import contextvars
 import json
 import os
+import threading
 import time
 
 import store
@@ -18,6 +19,10 @@ LEGACY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "paper_ac
 START = {"USD": 10000.0, "INR": 1000000.0}
 MAX_RISK_PCT = 2.0  # refuse a trade that loses more than this % of the balance if SL is hit
 fetch = fetch_universal_candles  # tests swap this for fake candles
+# Every load-change-save runs under this lock, and price fetches stay outside it: a save from a slow
+# request must never overwrite a trade another request saved meanwhile.
+# shortcut: one lock per process; Render runs one process, add a DB row lock if it ever runs several
+_lock = threading.Lock()
 
 
 def currency(symbol):
@@ -56,15 +61,16 @@ def open_trade(symbol, side, qty, sl, tp=None, price=None):
     sign = 1 if side == "BUY" else -1
     if (entry - sl) * sign <= 0 or (tp and (tp - entry) * sign <= 0):
         raise ValueError(f"{side} at {entry}: SL must be on the losing side and TP on the winning side.")
-    acct = load()
     cur = currency(symbol)
     risk = abs(entry - sl) * qty
-    if risk > acct["balance"][cur] * MAX_RISK_PCT / 100:
-        raise ValueError(f"Refused: risk {risk:.2f} {cur} is over {MAX_RISK_PCT}% of the {cur} balance.")
-    trade = {"id": len(acct["trades"]) + 1, "symbol": symbol, "side": side, "qty": qty, "entry": entry,
-             "sl": sl, "tp": tp, "currency": cur, "opened": time.time(), "status": "OPEN"}
-    acct["trades"].append(trade)
-    save(acct)
+    with _lock:
+        acct = load()
+        if risk > acct["balance"][cur] * MAX_RISK_PCT / 100:
+            raise ValueError(f"Refused: risk {risk:.2f} {cur} is over {MAX_RISK_PCT}% of the {cur} balance.")
+        trade = {"id": len(acct["trades"]) + 1, "symbol": symbol, "side": side, "qty": qty, "entry": entry,
+                 "sl": sl, "tp": tp, "currency": cur, "opened": time.time(), "status": "OPEN"}
+        acct["trades"].append(trade)
+        save(acct)
     return {"ok": True, "platform": "paper", "trade": trade}
 
 
@@ -76,9 +82,8 @@ def _settle(acct, t, exit_price, why):
 
 def positions():
     """Close trades whose SL/TP was touched by real candles, then report balances and open P&L."""
-    acct = load()
-    out = []
-    for t in (t for t in acct["trades"] if t["status"] == "OPEN"):
+    out, hits = [], {}
+    for t in (t for t in load()["trades"] if t["status"] == "OPEN"):
         c = fetch(t["symbol"], "M15", 200)  # shortcut: only the last 200 M15 bars are checked
         sign = 1 if t["side"] == "BUY" else -1
         for tm, hi, lo in zip(c["time"], c["high"], c["low"]):
@@ -86,24 +91,36 @@ def positions():
                 continue
             worst, best = (lo, hi) if sign == 1 else (hi, lo)
             if (worst - t["sl"]) * sign <= 0:  # SL first when both are touched in one bar: the cautious guess
-                _settle(acct, t, t["sl"], "STOP_LOSS")
+                hits[t["id"]] = (t["sl"], "STOP_LOSS")
                 break
             if t["tp"] and (best - t["tp"]) * sign >= 0:
-                _settle(acct, t, t["tp"], "TAKE_PROFIT")
+                hits[t["id"]] = (t["tp"], "TAKE_PROFIT")
                 break
         else:
             now = float(c["close"][-1])
             out.append({**t, "price": now, "open_pnl": round((now - t["entry"]) * t["qty"] * sign, 2)})
-    save(acct)
+    with _lock:  # re-read: trades opened or closed during the fetches above must survive this save
+        acct = load()
+        settled = [t for t in acct["trades"] if t["status"] == "OPEN" and t["id"] in hits]
+        for t in settled:
+            _settle(acct, t, *hits[t["id"]])
+        if settled:
+            save(acct)
     return {"balance": acct["balance"], "open": out,
             "closed": [t for t in acct["trades"] if t["status"] != "OPEN"][-10:]}
 
 
 def close_trade(trade_id, price=None):
-    acct = load()
-    t = next((t for t in acct["trades"] if t["id"] == trade_id and t["status"] == "OPEN"), None)
+    is_open = lambda t: t["id"] == trade_id and t["status"] == "OPEN"  # noqa: E731
+    t = next((t for t in load()["trades"] if is_open(t)), None)
     if not t:
         raise ValueError(f"No open paper trade {trade_id}")
-    _settle(acct, t, price or last_price(t["symbol"]), "CLOSED")
-    save(acct)
+    price = price or last_price(t["symbol"])  # network fetch, so outside the lock
+    with _lock:
+        acct = load()
+        t = next((t for t in acct["trades"] if is_open(t)), None)
+        if not t:
+            raise ValueError(f"Paper trade {trade_id} was already closed")
+        _settle(acct, t, price, "CLOSED")
+        save(acct)
     return {"ok": True, "trade": t, "balance": acct["balance"]}

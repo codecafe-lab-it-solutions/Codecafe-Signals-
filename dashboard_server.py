@@ -238,6 +238,11 @@ def api_positions(request):  # sync: Starlette runs it in a worker thread
     return JSONResponse([asdict(p) for p in positions])
 
 
+def api_history(request):  # sync: Starlette runs it in a worker thread
+    """This login's closed paper trades (SL, TP or manual close), newest first."""
+    return JSONResponse([t for t in paper.load()["trades"] if t["status"] != "OPEN"][::-1])
+
+
 def api_trades(request):  # sync: Starlette runs it in a worker thread
     """Trade history from local DB."""
     trades = db.get_open_trades()
@@ -326,6 +331,7 @@ routes = [
     Route("/api/backtest", api_backtest),
     Route("/api/positions", api_positions),
     Route("/api/trades", api_trades),
+    Route("/api/history", api_history),
     Route("/api/emergency_stop", api_emergency_stop, methods=["POST"]),
     Route("/api/resume", api_resume, methods=["POST"]),
     Route("/api/execute", api_execute, methods=["POST"]),

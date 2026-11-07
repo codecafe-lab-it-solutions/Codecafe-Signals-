@@ -77,6 +77,8 @@ def generate_market_intelligence(symbol: str, timeframe: str = "H1", use_llm: bo
         "timeframe": timeframe,
         "current_price": round(current_price, 4),
         "data_timestamp": data_timestamp,
+        "data_source": candles.get("source"),  # mt5, bybit or yahoo
+        "data_symbol": candles.get("symbol"),  # the feed's own ticker, e.g. GC=F for XAUUSD on Yahoo
         "market_direction": direction,
         "market_regime": regime_data["regime"],
         "volatility_condition": regime_data["volatility_status"],
