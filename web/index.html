@@ -402,7 +402,10 @@
       const res = await fetch("/api/scan");
       if (!res.ok) throw new Error(`scan returned ${res.status}`);
       const scans = await res.json();
-      const match = scans.find(s => s.symbol === currentSymbol) || scans[0];
+      // open tab first; if it has no setup, show a market that does, so its trade button appears
+      const tradable = s => ["BUY", "SELL"].includes(s.signal?.action);
+      const match = scans.find(s => s.symbol === currentSymbol && tradable(s)) || scans.find(tradable)
+        || scans.find(s => s.symbol === currentSymbol) || scans[0];
       if (match && match.signal) {
         latestSignal = match.signal;
         const act = match.signal.action;
@@ -417,7 +420,8 @@
       }
       loadPositions();
       return `Scanned ${scans.length} markets at ${new Date().toLocaleTimeString()}: ` +
-        scans.map(s => `${s.symbol} ${s.error ? "error" : (s.signal?.action ?? "?")}`).join(", ");
+        scans.map(s => `${s.symbol} ${s.error ? "error" : (s.signal?.action ?? "?")}`).join(", ") +
+        (match && tradable(match) ? `. ${match.symbol} ${match.signal.action} is on the signal card: press Execute Paper Trade.` : ". No trade setup right now.");
     }
 
     async function executeCurrentSignal() {
