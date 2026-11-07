@@ -18,6 +18,18 @@ from datetime import datetime, timezone
 import numpy as np
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+TF_SECONDS = {"M1": 60, "M5": 300, "M15": 900, "H1": 3600, "H4": 14400, "D1": 86400}
+
+
+def closed_bars(candles: dict, timeframe: str) -> dict:
+    """Candles without the still-forming last bar (Yahoo and Bybit send it; MT5 bars are already closed),
+    so a signal built on them cannot appear and vanish before the bar closes."""
+    t = candles["time"]
+    if len(t) > 1 and float(t[-1]) + TF_SECONDS.get(timeframe.upper(), 3600) > time.time():
+        return {k: v[:-1] if isinstance(v, (np.ndarray, list)) else v for k, v in candles.items()}
+    return candles
+
+
 YF_INTERVALS = {"M1": "1m", "M5": "5m", "M15": "15m", "H1": "60m", "H4": "1h", "D1": "1d"}
 
 

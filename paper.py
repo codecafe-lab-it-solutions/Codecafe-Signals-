@@ -106,7 +106,8 @@ def positions():
         if settled:
             save(acct)
     return {"balance": acct["balance"], "open": out,
-            "closed": [t for t in acct["trades"] if t["status"] != "OPEN"][-10:]}
+            "closed": [t for t in acct["trades"] if t["status"] != "OPEN"][-10:],
+            "settled": settled}  # closed by this call, for alerts
 
 
 def close_trade(trade_id, price=None):

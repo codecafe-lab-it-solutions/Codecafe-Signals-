@@ -8,7 +8,6 @@ import math
 from typing import Any
 import numpy as np
 
-from signals import atr_series, ema, rsi_series
 
 
 @dataclass
@@ -50,6 +49,9 @@ def run_historical_backtest(
     slippage_pct: float = 0.0002,
     risk_pct_per_trade: float = 1.0,
     starting_balance: float = 10000.0,
+    symbol: str = "",
+    timeframe: str = "H1",
+    point: float = 0.0,
 ) -> BacktestMetrics:
     """Execute historical simulation with execution costs and risk-adjusted sizing."""
     close = np.asarray(candles["close"], dtype=float)
@@ -57,14 +59,15 @@ def run_historical_backtest(
     low = np.asarray(candles["low"], dtype=float)
     open_ = np.asarray(candles["open"], dtype=float)
     n = len(close)
+    point = point or float(np.median(close)) * 1e-5  # spread_points are in units of this price step
 
-    if n < 60:
+    if n < 90:  # the strategies need 80 bars of history
         return BacktestMetrics(0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, [starting_balance])
 
-    # Indicators
-    e20 = ema(close, 20)
-    e50 = ema(close, 50)
-    atrs = atr_series(high, low, close, 14)
+    from intelligence import technical_report  # lazy: intelligence imports heavy modules
+    from strategies import StrategyManager
+    strategies = StrategyManager()
+    window = 80  # same bar count the live scan analyses
 
     balance = starting_balance
     equity_curve = [balance]
@@ -77,7 +80,7 @@ def run_historical_backtest(
     active_bar = 0
     active_qty = 0.0
 
-    for i in range(50, n):
+    for i in range(window, n):
         # 1. Manage open position
         if in_pos:
             sign = 1 if active_side == "BUY" else -1
@@ -112,42 +115,24 @@ def run_historical_backtest(
                 in_pos = False
             continue
 
-        # 2. Check entry condition: EMA 20/50 cross with ATR SL/TP
-        if not in_pos and i >= 1 and not np.isnan(atrs[i]):
-            c = close[i]
-            atr = atrs[i]
-
-            # Bullish cross
-            if e20[i] > e50[i] and e20[i - 1] <= e50[i - 1]:
-                entry = c * (1 + slippage_pct)
-                sl = entry - 2.0 * atr
-                tp = entry + 3.0 * atr
-                risk_dollars = balance * (risk_pct_per_trade / 100.0)
-                qty = risk_dollars / (entry - sl) if entry > sl else 0.01
-
-                in_pos = True
-                active_side = "BUY"
-                active_entry = entry
-                active_sl = sl
-                active_tp = tp
-                active_bar = i
-                active_qty = qty
-
-            # Bearish cross
-            elif e20[i] < e50[i] and e20[i - 1] >= e50[i - 1]:
-                entry = c * (1 - slippage_pct)
-                sl = entry + 2.0 * atr
-                tp = entry - 3.0 * atr
-                risk_dollars = balance * (risk_pct_per_trade / 100.0)
-                qty = risk_dollars / (sl - entry) if sl > entry else 0.01
-
-                in_pos = True
-                active_side = "SELL"
-                active_entry = entry
-                active_sl = sl
-                active_tp = tp
-                active_bar = i
-                active_qty = qty
+        # 2. Entry: the live strategies on the last `window` closed bars, as the scan sees them.
+        # News is unknown in history, so it counts as NEUTRAL.
+        bars = {k: np.asarray(candles[k])[i - window + 1:i + 1] for k in ("time", "open", "high", "low", "close")}
+        sig = strategies.evaluate_all(technical_report(symbol, timeframe, bars, float(close[i])))
+        if sig.action not in ("BUY", "SELL"):
+            continue
+        sign = 1 if sig.action == "BUY" else -1
+        entry = close[i] * (1 + slippage_pct * sign) + spread_points * point * sign / 2
+        risk_per_unit = (entry - sig.sl) * sign
+        if risk_per_unit <= 0 or (sig.tp - entry) * sign < 1.49 * risk_per_unit:
+            continue  # the live risk engine refuses these (SL on the wrong side, or R:R under 1.5)
+        in_pos = True
+        active_side = sig.action
+        active_entry = entry
+        active_sl = sig.sl
+        active_tp = sig.tp
+        active_bar = i
+        active_qty = balance * (risk_pct_per_trade / 100.0) / risk_per_unit
 
     # Calculate metrics
     total_trades = len(trades)

@@ -1,0 +1,15 @@
+name: tests
+on: [push, pull_request]
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      # offline suites only: no API keys, no market data calls
+      - run: uv run python test_auth.py
+      - run: uv run python test_core.py
+      - run: uv run python test_security_and_fixes.py
+      - run: uv run python test_omni.py

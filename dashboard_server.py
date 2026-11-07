@@ -20,6 +20,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 
 import auth
 import coach
+import notify
 import paper
 from backtester import run_historical_backtest
 from broker import OrderRequest, get_broker
@@ -31,7 +32,7 @@ from orchestrator import AutonomousTradingOrchestrator
 from rag_kb import add_document, get_all_documents, search_knowledge_base
 from risk_engine import RiskEngine
 from streamer import stream_manager
-from universal_data import USER_AGENT, fetch_universal_candles
+from universal_data import USER_AGENT, closed_bars, fetch_universal_candles
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 HTML_PATH = os.path.join(WEB_DIR, "index.html")
@@ -302,8 +303,8 @@ def api_backtest(request):  # sync: Starlette runs it in a worker thread
     sym = request.query_params.get("symbol", WATCHLIST[0])
     tf = request.query_params.get("tf", "H1")
     count = int(request.query_params.get("count", "300"))
-    candles = fetch_universal_candles(sym, tf, count=count)
-    res = run_historical_backtest(candles)
+    candles = closed_bars(fetch_universal_candles(sym, tf, count=count), tf)
+    res = run_historical_backtest(candles, symbol=sym, timeframe=tf)
     return JSONResponse(asdict(res))
 
 
@@ -347,19 +348,17 @@ async def api_execute(request):
         qty = float(body.get("qty", 0.01))
         sl = float(body.get("sl", 0.0))
         tp = float(body.get("tp", 0.0)) if body.get("tp") else None
-        price = float(body.get("price", 0.0)) if body.get("price") else None
-
-        if not price and sym:
-            try:
-                price = float(fetch_universal_candles(sym, "M15", 10)["close"][-1])
-            except Exception:
-                price = 0.0
+        # fill at the live price, never at a price the browser sends (it may be stale or edited)
+        try:
+            price = float((await asyncio.to_thread(fetch_universal_candles, sym, "M15", 10))["close"][-1])
+        except Exception as e:
+            return JSONResponse({"ok": False, "error": f"No live price for {sym}: {e}"}, status_code=502)
 
         risk_res = risk.validate_trade(
             broker=broker,
             symbol=sym,
             side=side,
-            entry=price or sl,
+            entry=price,
             sl=sl,
             tp=tp,
             check_news=False,
@@ -397,13 +396,58 @@ def api_ml_train(request):  # sync: Starlette runs it in a worker thread
     return JSONResponse(asdict(eval_res))
 
 
+def settle_all_accounts():
+    """Check every login's open paper trades for SL/TP hits, so they close even with no page open."""
+    for name in list(auth.users()) or ["local"]:
+        paper.USER.set(name)  # runs in its own thread, so this never leaks into a request
+        if not any(t["status"] == "OPEN" for t in paper.load()["trades"]):
+            continue
+        for t in paper.positions()["settled"]:
+            notify.send(f"{name}: paper #{t['id']} {t['side']} {t['symbol']} closed by {t['status']} "
+                        f"at {t['exit']:g}, P&L {t['pnl']:+.2f} {t['currency']}")
+
+
+_last_signal: dict[str, str] = {}
+
+
+def scan_and_alert():
+    """Scan the watchlist and send an alert when a market's signal changes to BUY or SELL."""
+    for s in WATCHLIST:
+        try:
+            sig = orchestrator.run_single_cycle(s, execute=False)["signal"] or {}
+        except Exception as e:
+            print(f"Background scan {s} failed: {e}")
+            continue
+        act = sig.get("action", "NO_TRADE")
+        if act in ("BUY", "SELL") and _last_signal.get(s) not in (None, act):
+            notify.send(f"Signal: {act} {s} at {sig['entry']:g}, SL {sig['sl']:g}, TP {sig['tp']:g} "
+                        f"({sig['strategy_id']}). Paper trading only, not financial advice.")
+        _last_signal[s] = act  # the first scan after a restart only records, so restarts don't spam
+
+
+async def background_worker():
+    """Every minute: settle SL/TP for all accounts. Every 15 minutes: scan for new signals."""
+    tick = 0
+    while True:
+        for job, every in ((settle_all_accounts, 1), (scan_and_alert, 15)):
+            if tick % every == 0:
+                try:
+                    await asyncio.to_thread(job)
+                except Exception as e:  # keep the loop alive whatever one run does
+                    print(f"Background {job.__name__} failed: {e}")
+        tick += 1
+        await asyncio.sleep(60)
+
+
 @asynccontextmanager
 async def lifespan(app):
     # Start live WebSocket tick streaming worker on startup
     stream_task = asyncio.create_task(stream_manager.stream_worker(interval_seconds=3.0))
+    worker_task = asyncio.create_task(background_worker())
     yield
     stream_manager.stop()
     stream_task.cancel()
+    worker_task.cancel()
 
 
 async def robots_txt(request):

@@ -25,3 +25,7 @@ services:
         sync: false
       - key: SECRET_KEY
         generateValue: true
+      - key: TELEGRAM_BOT_TOKEN  # optional: alerts for signals and SL/TP hits
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false

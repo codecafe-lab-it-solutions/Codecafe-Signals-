@@ -44,6 +44,30 @@ class RiskEngine:
         self._stopped_users.discard(paper.USER.get())
         db.log_audit("KILL_SWITCH_RESET", {"status": "normal", "user": paper.USER.get()})
 
+    SL_COOLDOWN_MIN = 60  # no new trade on a symbol for this long after it hit its stop-loss
+    MAX_LOSS_STREAK = 3  # losing trades in a row (closed today, UTC) that pause trading until tomorrow
+
+    def protection_refusal(self, symbol: str, now: float | None = None) -> str | None:
+        """Reason to refuse a new paper trade, or None. Rules modelled on freqtrade's protections."""
+        import time
+
+        import paper
+        now = now or time.time()
+        closed = sorted((t for t in paper.load()["trades"] if t.get("closed")), key=lambda t: t["closed"])
+        last_sl = max((t["closed"] for t in closed if t["symbol"] == symbol and t["status"] == "STOP_LOSS"), default=0)
+        wait = last_sl + self.SL_COOLDOWN_MIN * 60 - now
+        if wait > 0:
+            return f"Refused: {symbol} hit its stop-loss recently; cooldown ends in {wait / 60:.0f} min."
+        today = [t for t in closed if t["closed"] >= now - now % 86400]
+        streak = 0
+        for t in reversed(today):
+            if t.get("pnl", 0) >= 0:
+                break
+            streak += 1
+        if streak >= self.MAX_LOSS_STREAK:
+            return f"Refused: {streak} losing trades in a row today; trading pauses until 00:00 UTC."
+        return None
+
     def calculate_position_size(self, balance: float, entry: float, sl: float, symbol: str) -> float:
         """Calculate lot / contract size based on 1% balance risk and stop loss distance."""
         sl_distance = abs(entry - sl)
@@ -114,6 +138,12 @@ class RiskEngine:
         max_permitted_loss = -balance * (self.max_daily_loss_pct / 100.0)
         if daily_loss <= max_permitted_loss:
             return RiskValidationResult(False, f"Refused: Daily loss limit reached ({daily_loss:.2f} <= {max_permitted_loss:.2f}).", 0.0, 0.0, 0.0)
+
+        # 5b. Protections (paper accounts): pause a symbol after its stop-loss, stop after a losing streak
+        if broker.name == "paper":
+            refusal = self.protection_refusal(symbol)
+            if refusal:
+                return RiskValidationResult(False, refusal, 0.0, 0.0, 0.0)
 
         # 6. Max Open Positions Cap
         open_positions = broker.get_positions()

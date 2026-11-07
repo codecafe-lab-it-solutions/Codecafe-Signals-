@@ -18,6 +18,10 @@ print("=" * 60)
 
 test_results = {}
 
+import store
+
+store.URL, store.DIR = "", tempfile.mkdtemp()  # paper trades go to a temp folder, never the real account
+
 # -------------------------------------------------------------
 # 1. SYSTEM 1: MARKET INTELLIGENCE TESTS
 # -------------------------------------------------------------

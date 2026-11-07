@@ -317,10 +317,11 @@
         <div class="metric-card"><span>Win rate</span><strong id="btWinRate">--%</strong></div>
         <div class="metric-card"><span>Profit factor</span><strong id="btPF">--</strong></div>
         <div class="metric-card"><span>Max drawdown</span><strong id="btDD">--%</strong></div>
-        <div class="metric-card"><span>Sharpe</span><strong id="btSharpe">--</strong></div>
+        <div class="metric-card"><span>Net P&amp;L on $10k</span><strong id="btNet">--</strong></div>
         <div class="metric-card"><span>Expectancy</span><strong id="btExp">--R</strong></div>
         <div class="metric-card"><span>Trades</span><strong id="btTrades">--</strong></div>
       </div>
+      <p class="muted" style="margin-top:10px;font-size:12px">Replays the same 3 strategies as the scan, on closed bars, with spread, slippage and $1 fee per trade. News counts as neutral. Past results don't predict future ones.</p>
     </div>
 
     <!-- Screen Coach -->
@@ -634,16 +635,17 @@
     }
 
     async function runBacktest() {
-      const res = await fetch(`/api/backtest?symbol=${currentSymbol}&tf=H1&count=300`);
+      const res = await fetch(`/api/backtest?symbol=${encodeURIComponent(currentSymbol)}&tf=H1&count=300`);
       if (!res.ok) throw new Error(`backtest returned ${res.status}`);
       const d = await res.json();
       document.getElementById("btWinRate").innerText = d.win_rate_pct + "%";
       document.getElementById("btPF").innerText = d.profit_factor;
       document.getElementById("btDD").innerText = d.max_drawdown_pct + "%";
-      document.getElementById("btSharpe").innerText = d.sharpe_ratio;
+      document.getElementById("btNet").innerText = (d.net_profit >= 0 ? "+$" : "-$") + Math.abs(d.net_profit).toFixed(2);
+      document.getElementById("btNet").style.color = d.net_profit >= 0 ? "var(--green)" : "var(--red)";
       document.getElementById("btExp").innerText = d.expectancy_r + "R";
       document.getElementById("btTrades").innerText = d.total_trades;
-      return `Backtest ${currentSymbol} H1, last 300 bars: ${d.total_trades} trades, win rate ${d.win_rate_pct}%, profit factor ${d.profit_factor}. ` +
+      return `Backtest ${currentSymbol} H1, last 300 bars: ${d.total_trades} trades, win rate ${d.win_rate_pct}%, net ${d.net_profit} USD, expectancy ${d.expectancy_r}R. ` +
         "Same data gives the same numbers until a new candle closes.";
     }
 

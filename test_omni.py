@@ -122,6 +122,17 @@ assert paper.close_trade(1, price=165.0)["trade"]["pnl"] == 50.0
 assert paper.load()["balance"]["USD"] == 10050.0
 assert paper.currency("RELIANCE.NS") == "INR"
 assert paper.daily_pnl() == 50.0  # +105 TP, -105 SL, +50 manual close
+from risk_engine import RiskEngine
+guard = RiskEngine()
+assert "cooldown" in guard.protection_refusal("AAPL")  # trade 3 hit its SL just now
+assert guard.protection_refusal("MSFT") is None  # the last close was a win, so no losing streak
+assert guard.protection_refusal("AAPL", now=time.time() + 3601) is None  # cooldown over
+paper.USER.set("streaky")
+acct = paper.load()
+acct["trades"] = [{"id": i, "symbol": "X", "status": "CLOSED", "closed": time.time() - 10 + i, "pnl": -1.0} for i in range(3)]
+paper.save(acct)
+assert "losing trades in a row" in guard.protection_refusal("Y")
+paper.USER.set("test")
 paper.USER.set("someone_else")
 assert paper.load()["balance"]["USD"] == 10000.0  # accounts are separate per login
 # a trade placed while positions() is still fetching prices must survive its save
